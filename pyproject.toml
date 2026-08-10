@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-cic"
+version = "0.1.0"
+description = "Holonic, ECS-inspired personal command environment"
+requires-python = ">=3.10"
+dependencies = [
+    "psutil>=5.9",
+]
+
+[project.scripts]
+cic-self = "personal_cic.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
