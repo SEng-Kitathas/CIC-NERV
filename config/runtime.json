@@ -1,0 +1,6 @@
+{
+  "collection_interval_seconds": 5.0,
+  "snapshot_interval_seconds": 5.0,
+  "state_path": "state/world.json",
+  "event_journal_path": "logs/events.jsonl"
+}

@@ -1,3 +1,4 @@
+from personal_cic.core.config import HealthThresholds
 from personal_cic.core.events import ComponentUpdated
 from personal_cic.core.world import WorldState
 from personal_cic.core.world.components import (
@@ -19,8 +20,9 @@ class HealthSystem:
         WifiLinkState.__name__,
     }
 
-    def __init__(self, world: WorldState) -> None:
+    def __init__(self, world: WorldState, thresholds: HealthThresholds) -> None:
         self.world = world
+        self.thresholds = thresholds
 
     def on_component_updated(self, event: ComponentUpdated) -> None:
         if event.component_name not in self.RELEVANT:
@@ -29,28 +31,29 @@ class HealthSystem:
 
     def evaluate(self, entity_id: str) -> None:
         entity = self.world.entities[entity_id]
+        t = self.thresholds
         critical: list[str] = []
         warning: list[str] = []
 
         compute = entity.get(ComputeState)
         if compute:
-            if compute.cpu_percent >= 95:
+            if compute.cpu_percent >= t.cpu_critical_percent:
                 critical.append(f"CPU {compute.cpu_percent:.0f}%")
-            elif compute.cpu_percent >= 80:
+            elif compute.cpu_percent >= t.cpu_warning_percent:
                 warning.append(f"CPU {compute.cpu_percent:.0f}%")
 
         memory = entity.get(MemoryState)
         if memory:
-            if memory.used_percent >= 95:
+            if memory.used_percent >= t.memory_critical_percent:
                 critical.append(f"memory {memory.used_percent:.0f}%")
-            elif memory.used_percent >= 85:
+            elif memory.used_percent >= t.memory_warning_percent:
                 warning.append(f"memory {memory.used_percent:.0f}%")
 
         storage = entity.get(StorageState)
         if storage:
-            if storage.used_percent >= 97:
+            if storage.used_percent >= t.storage_critical_percent:
                 critical.append(f"storage {storage.used_percent:.0f}%")
-            elif storage.used_percent >= 90:
+            elif storage.used_percent >= t.storage_warning_percent:
                 warning.append(f"storage {storage.used_percent:.0f}%")
 
         usb = entity.get(UsbDeviceState)
@@ -64,7 +67,10 @@ class HealthSystem:
         if wifi:
             if not wifi.connected:
                 critical.append("Wi-Fi disconnected")
-            elif wifi.signal_dbm is not None and wifi.signal_dbm <= -75:
+            elif (
+                wifi.signal_dbm is not None
+                and wifi.signal_dbm <= t.wifi_signal_warning_dbm
+            ):
                 warning.append(f"Wi-Fi signal {wifi.signal_dbm} dBm")
 
         if critical:
@@ -72,8 +78,14 @@ class HealthSystem:
         elif warning:
             status, reasons = "warning", tuple(warning)
         elif any(
-            entity.get(t) is not None
-            for t in (ComputeState, MemoryState, StorageState, UsbDeviceState, WifiLinkState)
+            entity.get(component_type) is not None
+            for component_type in (
+                ComputeState,
+                MemoryState,
+                StorageState,
+                UsbDeviceState,
+                WifiLinkState,
+            )
         ):
             status, reasons = "nominal", ()
         else:

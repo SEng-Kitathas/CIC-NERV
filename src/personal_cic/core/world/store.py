@@ -1,7 +1,7 @@
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 import json
-from typing import Any
+from typing import Any, Literal
 
 from personal_cic.core.events import ComponentUpdated, EventBus
 from .entity import Entity
@@ -19,7 +19,13 @@ class WorldState:
             self.entities[entity_id] = entity
         return entity
 
-    def upsert_component(self, entity_id: str, component: Any) -> bool:
+    def upsert_component(
+        self,
+        entity_id: str,
+        component: Any,
+        *,
+        significance: Literal["material", "sample"] = "material",
+    ) -> bool:
         entity = self.entities[entity_id]
         previous = entity.components.get(type(component).__name__)
         if previous == component:
@@ -32,6 +38,7 @@ class WorldState:
                 component_name=type(component).__name__,
                 previous=previous,
                 current=component,
+                significance=significance,
             )
         )
         return True
