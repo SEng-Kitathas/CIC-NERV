@@ -26,18 +26,24 @@ class LinuxHostAdapter:
             ordered = [name for name in preferred if name in sensors]
             ordered.extend(name for name in sensors if name not in ordered)
 
-            candidates: list[tuple[float, str]] = []
+            candidates: list[float] = []
             for group in ordered:
                 for reading in sensors.get(group, ()):
                     if reading.current is not None:
-                        label = reading.label or group
-                        candidates.append((float(reading.current), f"{group}:{label}"))
+                        candidates.append(float(reading.current))
 
             if candidates:
-                current, source = max(candidates, key=lambda item: item[0])
+                # TemperatureState represents the maximum currently exposed host
+                # temperature, not the identity of whichever physical sensor happens
+                # to be hottest on this sample.  Keep the logical source stable so
+                # Package/Core hand-offs do not fabricate durable source changes.
+                current = max(candidates)
                 return Observation.observed(
                     "linux.temperature",
-                    TemperatureState(round(current, 1), source),
+                    TemperatureState(
+                        round(current, 1),
+                        "psutil:sensors_temperatures:max",
+                    ),
                 )
 
             # Successful sensor query with no exposed sensor is a valid observation.

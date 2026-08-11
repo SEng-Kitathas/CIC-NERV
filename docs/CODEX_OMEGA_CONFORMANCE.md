@@ -10,6 +10,7 @@
 - **Semantic home:** adapters own OS/vendor observation mechanics; world components own normalized facts; systems own derivation; presentation owns projection only.
 - **Strongest practical enforcement:** closed health/observation states are represented as enums; unavailable observations cannot carry a new domain value.
 - **Causal/provenance integrity:** durable component causes precede derived health effects; high-rate samples stay out of semantic history.
+- **Stable semantic identity:** derived telemetry sources identify the measurement policy, not transient winning sensor labels.
 - **Complexity budget:** systemd remains process supervisor; the runtime does not grow a second supervisor.
 
 ## Current residual seams

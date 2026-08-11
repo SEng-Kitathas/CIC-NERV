@@ -112,3 +112,9 @@ and separately records an `ObservationState` that tells systems whether the curr
 telemetry is current, degraded, or unavailable. Health derivation runs only after an
 adapter observation batch is complete, avoiding transient health conclusions from
 half-updated state.
+
+## 0.2.4 temperature source stability
+
+Host temperature remains the maximum currently exposed sensor value, but the
+semantic source is stable across Package/Core hand-offs. Normal sensor-order
+changes therefore remain live telemetry instead of durable operational history.

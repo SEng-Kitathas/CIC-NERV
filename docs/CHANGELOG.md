@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4 — Temperature Source Stability
+
+- Defines `TemperatureState` as the maximum currently exposed host temperature under a stable logical source identity.
+- Prevents Package/Core hottest-sensor hand-offs from fabricating durable `TemperatureState` source transitions.
+- Preserves conservative max-temperature health semantics while separating measurement policy from transient physical-sensor identity.
+- Synchronizes `personal_cic.__version__` with project metadata.
+- Adds target-derived regression coverage for temperature-source stability.
+
 ## 0.2.3 — Observation Integrity
 
 - Added typed adapter `Observation` values: observed / partial / unavailable.

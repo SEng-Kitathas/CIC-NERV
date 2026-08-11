@@ -99,3 +99,14 @@ and `WifiLinkState` remain the semantic homes for device/link facts. This preven
 Health derivation now uses an explicit observation-cycle barrier. Component updates
 are journaled before the derived health effect, but the system evaluates only after
 the adapter has finished publishing the coherent batch.
+
+## 0.2.4 temperature source stability
+
+`TemperatureState` represents one logical host-temperature measurement: the
+maximum currently exposed temperature returned by `psutil.sensors_temperatures`.
+Its `source` therefore identifies the stable measurement policy
+(`psutil:sensors_temperatures:max`), not whichever Package/Core sensor happens
+to win a particular sample.
+
+This keeps conservative thermal-health behavior while preventing transient
+hottest-sensor hand-offs from becoming false durable provenance changes.
