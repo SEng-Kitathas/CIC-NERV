@@ -27,3 +27,11 @@ These are explicit backlog, not hidden compliance claims:
 ## Promotion rule
 
 A residual becomes P0 only when it creates a demonstrated correctness, authority, continuity, or change-safety defect in the next vertical slice. The existence of a static-code smell alone does not outrank useful CIC capability.
+
+## Slice 003 conformance
+
+- **Semantic home:** live domain truth remains `WorldState`; presentation is a projection.
+- **Boundary integrity:** browser code cannot query hardware/native services directly.
+- **Authority integrity:** the presentation server exposes GET/HEAD only; mutation verbs are rejected.
+- **Scoped authority:** WLAN association is rendered as WLAN state, not promoted to Internet capability.
+- **Concurrency ownership:** `WorldState` owns synchronization introduced by the concurrent presentation reader.

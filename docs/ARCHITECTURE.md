@@ -110,3 +110,23 @@ to win a particular sample.
 
 This keeps conservative thermal-health behavior while preventing transient
 hottest-sensor hand-offs from becoming false durable provenance changes.
+
+## Slice 003 presentation boundary
+
+```text
+WorldState
+    ↓ atomic snapshot
+presentation projector
+    ↓
+loopback read-only HTTP server
+    ↓
+local browser
+```
+
+Presentation is a projection boundary, not a truth owner.
+
+Slice 003 adds `WorldState` synchronization because the runtime writer and HTTP
+reader now coexist. The semantic home for synchronization is `WorldState`; the
+HTTP layer is not allowed to coordinate domain mutation itself.
+
+Mutation methods are structurally absent from the presentation API.

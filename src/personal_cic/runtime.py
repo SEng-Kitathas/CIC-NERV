@@ -8,6 +8,8 @@ import time
 from personal_cic.bootstrap import collect_once, create_context, reconcile_topology
 from personal_cic.core.config import RuntimeConfig
 from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted, RuntimeStopping
+from personal_cic.core.events import utc_now_iso
+from personal_cic.presentation import PresentationServer
 
 
 class PersistentRuntime:
@@ -28,10 +30,25 @@ class PersistentRuntime:
         self.stop_event = threading.Event()
         self.stop_reason = "requested"
         self._last_snapshot_monotonic = 0.0
+        self._runtime_started_at: str | None = None
+        self.presentation: PresentationServer | None = None
+        if self.runtime_config.presentation.enabled:
+            self.presentation = PresentationServer(
+                world=self.context.world,
+                host=self.runtime_config.presentation.bind_host,
+                port=self.runtime_config.presentation.port,
+                runtime_metadata=self._presentation_metadata,
+            )
 
     def request_stop(self, reason: str) -> None:
         self.stop_reason = reason
         self.stop_event.set()
+
+    def _presentation_metadata(self) -> dict:
+        return {
+            "pid": os.getpid(),
+            "started_at": self._runtime_started_at,
+        }
 
     def _snapshot_if_due(self, force: bool = False) -> None:
         now = time.monotonic()
@@ -47,6 +64,7 @@ class PersistentRuntime:
         # Attach the durable observer only after silent state hydration. The first
         # new event of this process lifetime is therefore RuntimeStarted.
         self.events.observe_all(self.journal.record)
+        self._runtime_started_at = utc_now_iso()
         self.events.publish(
             RuntimeStarted(
                 pid=os.getpid(),
@@ -57,6 +75,9 @@ class PersistentRuntime:
         reconcile_topology(self.context)
 
         try:
+            if self.presentation is not None:
+                self.presentation.start()
+
             while not self.stop_event.is_set():
                 cycle_started = time.monotonic()
                 collect_once(self.context)
@@ -69,6 +90,8 @@ class PersistentRuntime:
                 )
                 self.stop_event.wait(wait_for)
         finally:
+            if self.presentation is not None:
+                self.presentation.stop()
             self._snapshot_if_due(force=True)
             self.events.publish(RuntimeStopping(reason=self.stop_reason))
 

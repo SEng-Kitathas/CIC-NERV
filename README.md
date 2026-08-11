@@ -118,3 +118,20 @@ half-updated state.
 Host temperature remains the maximum currently exposed sensor value, but the
 semantic source is stable across Package/Core hand-offs. Normal sensor-order
 changes therefore remain live telemetry instead of durable operational history.
+
+## 0.3.0 — Systems presentation
+
+The persistent runtime now exposes a loopback-only, read-only Systems surface:
+
+```text
+http://127.0.0.1:8765/
+```
+
+Browser-visible state is projected from CIC `WorldState`; the browser performs no
+direct hardware, kernel, NetworkManager, systemd, or vendor queries.
+
+JSON projection:
+
+```text
+GET http://127.0.0.1:8765/api/v1/systems
+```

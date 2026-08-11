@@ -2,5 +2,10 @@
   "collection_interval_seconds": 5.0,
   "snapshot_interval_seconds": 5.0,
   "state_path": "state/world.json",
-  "event_journal_path": "logs/events.jsonl"
+  "event_journal_path": "logs/events.jsonl",
+  "presentation": {
+    "enabled": true,
+    "bind_host": "127.0.0.1",
+    "port": 8765
+  }
 }

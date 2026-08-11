@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — Slice 003 Presentation Surface
+
+- Adds the first read-only browser presentation directly projected from live CIC `WorldState`.
+- Adds a loopback-only HTTP endpoint at `GET /api/v1/systems` and a local Systems dashboard.
+- Explicitly rejects HTTP mutation verbs; presentation has no actuation authority.
+- Adds WorldState locking because presentation introduces a real concurrent reader.
+- Surfaces observation freshness, health, host telemetry, Tenda USB state, and WLAN state without direct browser hardware queries.
+- Deliberately labels WLAN association as WLAN state rather than claiming Internet capability.
+- Adds presentation/configuration/server regression tests.
+
 ## 0.2.4 — Temperature Source Stability
 
 - Defines `TemperatureState` as the maximum currently exposed host temperature under a stable logical source identity.

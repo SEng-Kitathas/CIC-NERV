@@ -4,11 +4,41 @@ import json
 
 
 @dataclass(frozen=True, slots=True)
+class PresentationConfig:
+    enabled: bool = False
+    bind_host: str = "127.0.0.1"
+    port: int = 8765
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "PresentationConfig":
+        if not data:
+            return cls()
+
+        bind_host = str(data.get("bind_host", "127.0.0.1"))
+        if bind_host != "127.0.0.1":
+            raise ValueError(
+                "Slice 003 presentation is intentionally loopback-only; "
+                "bind_host must be 127.0.0.1"
+            )
+
+        port = int(data.get("port", 8765))
+        if not 1 <= port <= 65535:
+            raise ValueError("presentation port must be between 1 and 65535")
+
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            bind_host=bind_host,
+            port=port,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeConfig:
     collection_interval_seconds: float
     snapshot_interval_seconds: float
     state_path: Path
     event_journal_path: Path
+    presentation: PresentationConfig = PresentationConfig()
 
     @classmethod
     def load(cls, path: Path) -> "RuntimeConfig":
@@ -18,6 +48,7 @@ class RuntimeConfig:
             snapshot_interval_seconds=float(data["snapshot_interval_seconds"]),
             state_path=Path(data["state_path"]),
             event_journal_path=Path(data["event_journal_path"]),
+            presentation=PresentationConfig.from_mapping(data.get("presentation")),
         )
 
 
