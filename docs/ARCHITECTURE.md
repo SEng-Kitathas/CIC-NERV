@@ -72,3 +72,30 @@ an event before typed systems may derive and publish consequences from it.
 High-frequency telemetry and durable history are intentionally separate concerns. WorldState is
 current truth; the event journal is semantic operational memory. A future metrics/time-series
 store may preserve high-resolution telemetry without corrupting event meaning.
+
+## 0.2.3 observation integrity boundary
+
+Codex Omega Law 3 is now executable at the adapter seam:
+
+```text
+OS / vendor probe
+    ↓
+typed Observation
+    ├── OBSERVED    -> update domain state
+    ├── PARTIAL     -> update known state + mark degraded
+    └── UNAVAILABLE -> preserve last known domain state; do not infer absence
+    ↓
+ObservationState
+    ↓
+ObservationCycleCompleted
+    ↓
+HealthSystem
+```
+
+`ObservationState` is the semantic home for adapter observability. `UsbDeviceState`
+and `WifiLinkState` remain the semantic homes for device/link facts. This prevents
+"could not inspect" from becoming a competing spelling of "device absent."
+
+Health derivation now uses an explicit observation-cycle barrier. Component updates
+are journaled before the derived health effect, but the system evaluates only after
+the adapter has finished publishing the coherent batch.

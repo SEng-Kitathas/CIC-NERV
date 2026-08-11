@@ -3,6 +3,7 @@ from personal_cic.core.world.components import (
     ComputeState,
     HealthState,
     MemoryState,
+    ObservationState,
     StorageState,
     TemperatureState,
     UptimeState,
@@ -31,7 +32,7 @@ def render(world: WorldState, event_count: int) -> None:
 
     for entity in world.entities.values():
         health = entity.get(HealthState)
-        status = health.status.upper() if health else "UNKNOWN"
+        status = health.status.value.upper() if health else "UNKNOWN"
         print(f"{entity.label} [{entity.entity_id}] :: {status}")
 
         compute = entity.get(ComputeState)
@@ -41,6 +42,13 @@ def render(world: WorldState, event_count: int) -> None:
         temp = entity.get(TemperatureState)
         usb = entity.get(UsbDeviceState)
         wifi = entity.get(WifiLinkState)
+        observation = entity.get(ObservationState)
+
+        if observation:
+            obs = observation.availability.value.upper()
+            print(f"  OBS  {obs} via {observation.adapter_id}")
+            if observation.reasons:
+                print("       " + "; ".join(observation.reasons))
 
         if compute:
             print(f"  CPU  {compute.cpu_percent:5.1f}% | load {compute.load_1m:.2f} | {compute.logical_cpus} logical CPUs")

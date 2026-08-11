@@ -93,5 +93,23 @@ class EventHygieneTests(unittest.TestCase):
             self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 1)
 
 
+    def test_wifi_frequency_roam_is_sample_not_durable_transition(self):
+        previous = WifiLinkState("wlan0", True, "home", 5785, -68, 100.0, 100.0, "192.168.1.2/24")
+        current = WifiLinkState("wlan0", True, "home", 2462, -58, 1.0, 86.0, "192.168.1.2/24")
+        self.assertEqual(
+            telemetry_significance(previous, current, THRESHOLDS),
+            "sample",
+        )
+
+    def test_wifi_missing_signal_is_sample_observation_quality_not_domain_event(self):
+        previous = WifiLinkState("wlan0", True, "home", 5785, -66, 324.2, 144.1, "192.168.1.2/24")
+        current = WifiLinkState("wlan0", True, "home", 5785, None, None, None, "192.168.1.2/24")
+        self.assertEqual(
+            telemetry_significance(previous, current, THRESHOLDS),
+            "sample",
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,11 +4,13 @@ from pathlib import Path
 from personal_cic.adapters.linux.host import LinuxHostAdapter
 from personal_cic.adapters.tenda.u11_pro import TendaU11ProAdapter
 from personal_cic.core.config import HealthThresholds
-from personal_cic.core.events import ComponentUpdated, EventBus
+from personal_cic.core.events import EventBus, ObservationCycleCompleted, utc_now_iso
+from personal_cic.core.observations import Observation, ObservationAvailability, ObservationStatus
 from personal_cic.core.world import WorldState
 from personal_cic.core.world.components import (
     CICNode,
     LinuxHost,
+    ObservationState,
     RFObserver,
     USBDevice,
     WiFiRadio,
@@ -45,7 +47,10 @@ def create_context(
 
     thresholds = HealthThresholds.load(health_config_path)
     health = HealthSystem(world, thresholds)
-    event_bus.subscribe(ComponentUpdated, health.on_component_updated)
+    event_bus.subscribe(
+        ObservationCycleCompleted,
+        health.on_observation_cycle_completed,
+    )
 
     return RuntimeContext(
         events=event_bus,
@@ -68,7 +73,7 @@ def reconcile_topology(context: RuntimeContext) -> None:
         context.world.upsert_component(TENDA_ID, component)
 
 
-def _observe(context: RuntimeContext, entity_id: str, component: object) -> None:
+def _observe(context: RuntimeContext, entity_id: str, component: object) -> str:
     entity = context.world.entities[entity_id]
     previous = entity.components.get(type(component).__name__)
     significance = telemetry_significance(previous, component, context.thresholds)
@@ -77,11 +82,83 @@ def _observe(context: RuntimeContext, entity_id: str, component: object) -> None
         component,
         significance=significance,
     )
+    return significance
+
+
+def _ingest_observation_batch(
+    context: RuntimeContext,
+    *,
+    entity_id: str,
+    adapter_id: str,
+    observations: tuple[Observation[object], ...],
+) -> None:
+    checked_at = utc_now_iso()
+    previous_state = context.world.entities[entity_id].get(ObservationState)
+
+    reasons = tuple(
+        f"{observation.source}: {observation.detail}"
+        for observation in observations
+        if observation.detail
+    )
+    unavailable_count = sum(
+        observation.status is ObservationStatus.UNAVAILABLE
+        for observation in observations
+    )
+    partial = any(
+        observation.status is ObservationStatus.PARTIAL
+        for observation in observations
+    )
+
+    if observations and unavailable_count == len(observations):
+        availability = ObservationAvailability.UNAVAILABLE
+    elif unavailable_count or partial:
+        availability = ObservationAvailability.DEGRADED
+    else:
+        availability = ObservationAvailability.CURRENT
+
+    successful = any(
+        observation.status in (ObservationStatus.OBSERVED, ObservationStatus.PARTIAL)
+        for observation in observations
+    )
+    last_success_at = (
+        checked_at
+        if successful
+        else previous_state.last_success_at if previous_state is not None else None
+    )
+
+    for observation in observations:
+        # Critical invariant: inability to observe is not evidence of a domain value.
+        if observation.value is not None:
+            _observe(context, entity_id, observation.value)
+
+    observation_state = ObservationState(
+        adapter_id=adapter_id,
+        availability=availability,
+        checked_at=checked_at,
+        last_success_at=last_success_at,
+        reasons=reasons,
+    )
+    _observe(context, entity_id, observation_state)
+
+    context.events.publish(
+        ObservationCycleCompleted(
+            entity_id=entity_id,
+            adapter_id=adapter_id,
+            availability=availability,
+        )
+    )
 
 
 def collect_once(context: RuntimeContext) -> None:
-    for component in context.host_adapter.collect():
-        _observe(context, ENGAGE_ID, component)
-
-    for component in context.tenda_adapter.collect():
-        _observe(context, TENDA_ID, component)
+    _ingest_observation_batch(
+        context,
+        entity_id=ENGAGE_ID,
+        adapter_id=context.host_adapter.ADAPTER_ID,
+        observations=context.host_adapter.collect(),
+    )
+    _ingest_observation_batch(
+        context,
+        entity_id=TENDA_ID,
+        adapter_id=context.tenda_adapter.ADAPTER_ID,
+        observations=context.tenda_adapter.collect(),
+    )

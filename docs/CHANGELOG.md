@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.3 — Observation Integrity
+
+- Added typed adapter `Observation` values: observed / partial / unavailable.
+- Added `ObservationState` with current / degraded / unavailable availability.
+- Adapter failure no longer fabricates USB absence or Wi-Fi disconnection.
+- Preserves last known domain state when the observation source is unavailable.
+- Health becomes `unknown` when telemetry is unavailable and `warning` when degraded.
+- Health derivation now occurs after a typed observation-cycle barrier.
+- Snapshot schema bumped to v2 and restores enum-backed observation/health state.
+- Event journal explicitly serializes enums and omits internal observation-heartbeat events.
+- Added regression tests for false-absence prevention, partial telemetry, continuity, and journal hygiene.
+
 ## 0.2.2 — Continuity and Causal Journal
 
 - Runtime now hydrates `state/world.json` before beginning a new process lifetime.
@@ -36,3 +48,11 @@
 - Added Linux and Tenda adapters.
 - Added typed components, WorldState, EventBus, HealthSystem, and console projection.
 - Added atomic world-state snapshot.
+
+### 0.2.3 RC3 static-gate cleanup
+
+- No semantic/runtime changes from RC2; this candidate only closes the static `git diff --check` whitespace gate.
+- Treat incomplete connected `iw link` snapshots as PARTIAL observation quality.
+- Stop journaling transient missing signal fields as durable Wi-Fi domain changes.
+- Treat normal frequency/channel roaming as live radio telemetry rather than durable operational history.
+- Preserve link/disconnect, SSID, interface, and IP structural transitions as material.

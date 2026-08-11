@@ -1,10 +1,13 @@
 from personal_cic.core.config import HealthThresholds
-from personal_cic.core.events import ComponentUpdated
+from personal_cic.core.events import ObservationCycleCompleted
 from personal_cic.core.world import WorldState
+from personal_cic.core.observations import ObservationAvailability
 from personal_cic.core.world.components import (
     ComputeState,
     HealthState,
+    HealthStatus,
     MemoryState,
+    ObservationState,
     StorageState,
     TemperatureState,
     UsbDeviceState,
@@ -13,22 +16,11 @@ from personal_cic.core.world.components import (
 
 
 class HealthSystem:
-    RELEVANT = {
-        ComputeState.__name__,
-        MemoryState.__name__,
-        StorageState.__name__,
-        TemperatureState.__name__,
-        UsbDeviceState.__name__,
-        WifiLinkState.__name__,
-    }
-
     def __init__(self, world: WorldState, thresholds: HealthThresholds) -> None:
         self.world = world
         self.thresholds = thresholds
 
-    def on_component_updated(self, event: ComponentUpdated) -> None:
-        if event.component_name not in self.RELEVANT:
-            return
+    def on_observation_cycle_completed(self, event: ObservationCycleCompleted) -> None:
         self.evaluate(event.entity_id)
 
     def evaluate(self, entity_id: str) -> None:
@@ -36,6 +28,20 @@ class HealthSystem:
         t = self.thresholds
         critical: list[str] = []
         warning: list[str] = []
+
+        observation = entity.get(ObservationState)
+        if observation and observation.availability is ObservationAvailability.UNAVAILABLE:
+            reason = "telemetry unavailable"
+            if observation.reasons:
+                reason += ": " + "; ".join(observation.reasons)
+            if observation.last_success_at:
+                reason += f"; last success {observation.last_success_at}"
+            self._set_health(entity_id, HealthState(HealthStatus.UNKNOWN, (reason,)))
+            return
+
+        if observation and observation.availability is ObservationAvailability.DEGRADED:
+            detail = "; ".join(observation.reasons) or "partial telemetry"
+            warning.append(f"telemetry degraded: {detail}")
 
         compute = entity.get(ComputeState)
         if compute:
@@ -83,9 +89,9 @@ class HealthSystem:
                 warning.append(f"Wi-Fi signal {wifi.signal_dbm} dBm")
 
         if critical:
-            status, reasons = "critical", tuple(critical + warning)
+            proposed = HealthState(HealthStatus.CRITICAL, tuple(critical + warning))
         elif warning:
-            status, reasons = "warning", tuple(warning)
+            proposed = HealthState(HealthStatus.WARNING, tuple(warning))
         elif any(
             entity.get(component_type) is not None
             for component_type in (
@@ -97,11 +103,16 @@ class HealthSystem:
                 WifiLinkState,
             )
         ):
-            status, reasons = "nominal", ()
+            proposed = HealthState(HealthStatus.NOMINAL, ())
         else:
-            status, reasons = "unknown", ("no health-bearing telemetry",)
+            proposed = HealthState(
+                HealthStatus.UNKNOWN,
+                ("no health-bearing telemetry",),
+            )
 
-        current = entity.get(HealthState)
-        proposed = HealthState(status=status, reasons=reasons)
-        if current != proposed:
+        self._set_health(entity_id, proposed)
+
+    def _set_health(self, entity_id: str, proposed: HealthState) -> None:
+        entity = self.world.entities[entity_id]
+        if entity.get(HealthState) != proposed:
             self.world.upsert_component(entity_id, proposed)

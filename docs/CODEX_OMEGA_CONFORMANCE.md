@@ -1,0 +1,28 @@
+# Codex Omega Conformance — Personal CIC
+
+**Scope:** current software baseline, not a claim of universal correctness.
+
+## Active constitutional constraints
+
+- **Promotion honesty:** each slice is bounded and versioned; experimental RF work remains under `lab/`.
+- **Resolve or represent uncertainty:** adapter/probe failure must not become fabricated device state.
+- **Evidence-proportionate verification:** each promoted slice requires targeted tests plus full regression.
+- **Semantic home:** adapters own OS/vendor observation mechanics; world components own normalized facts; systems own derivation; presentation owns projection only.
+- **Strongest practical enforcement:** closed health/observation states are represented as enums; unavailable observations cannot carry a new domain value.
+- **Causal/provenance integrity:** durable component causes precede derived health effects; high-rate samples stay out of semantic history.
+- **Complexity budget:** systemd remains process supervisor; the runtime does not grow a second supervisor.
+
+## Current residual seams
+
+These are explicit backlog, not hidden compliance claims:
+
+1. `Entity.components`, the event bus, and journal codec still contain broad dynamic carrier types at core seams.
+2. `Intent` is still stringly and uses `dict[str, Any]`; control authority is not yet embodied.
+3. `UsbDeviceState.mode` is still an open string despite a currently small known state family.
+4. A single `ObservationState` currently assumes one primary adapter per entity. Multi-source entities will need keyed source-observation state before promotion.
+5. World-state serialization deliberately mirrors registered component dataclasses and is versioned, but does not yet have explicit per-version migrations.
+6. Tenda interface attribution still assumes the CIC's relevant WLAN surface and has not yet been proven against a host with multiple unrelated Wi-Fi adapters.
+
+## Promotion rule
+
+A residual becomes P0 only when it creates a demonstrated correctness, authority, continuity, or change-safety defect in the next vertical slice. The existence of a static-code smell alone does not outrank useful CIC capability.

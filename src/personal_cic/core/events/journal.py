@@ -1,9 +1,10 @@
 from dataclasses import asdict, is_dataclass
+from enum import Enum
 from pathlib import Path
 import json
 from typing import Any
 
-from .model import ComponentUpdated
+from .model import ComponentUpdated, ObservationCycleCompleted
 
 
 class EventJournal:
@@ -15,6 +16,8 @@ class EventJournal:
 
     @staticmethod
     def _jsonable(value: Any) -> Any:
+        if isinstance(value, Enum):
+            return value.value
         if is_dataclass(value):
             return {
                 key: EventJournal._jsonable(item)
@@ -31,8 +34,10 @@ class EventJournal:
 
     def record(self, event: Any) -> None:
         # Samples still flow through the internal event bus so systems can react,
-        # but the durable event journal is for meaningful operational changes.
+        # but durable history is reserved for semantic operational changes.
         if isinstance(event, ComponentUpdated) and event.significance == "sample":
+            return
+        if isinstance(event, ObservationCycleCompleted):
             return
 
         record = {

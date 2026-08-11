@@ -1,5 +1,15 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
+from personal_cic.core.observations import ObservationAvailability
+
+
+class HealthStatus(str, Enum):
+    UNKNOWN = "unknown"
+    NOMINAL = "nominal"
+    WARNING = "warning"
+    CRITICAL = "critical"
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +92,15 @@ class WifiLinkState:
 
 
 @dataclass(frozen=True, slots=True)
+class ObservationState:
+    adapter_id: str
+    availability: ObservationAvailability
+    checked_at: str
+    last_success_at: str | None
+    reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class HealthState:
-    status: str
+    status: HealthStatus
     reasons: tuple[str, ...]

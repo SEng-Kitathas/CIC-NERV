@@ -99,3 +99,16 @@ The runtime now rehydrates `state/world.json` before starting a new process life
 unchanged topology and ordinary telemetry do not masquerade as newly discovered facts.
 `RuntimeStarted` reports how many entities were restored, and the event journal records causes
 before derived health effects.
+
+## 0.2.3 observation integrity
+
+Slice 002c hardens the telemetry boundary under Codex Omega's **resolve or represent
+uncertainty** rule. Adapter command failure is no longer allowed to masquerade as a
+device being absent or disconnected.
+
+Adapters now emit typed observations with `observed`, `partial`, or `unavailable`
+status. The world keeps the last known domain value when observation is unavailable,
+and separately records an `ObservationState` that tells systems whether the current
+telemetry is current, degraded, or unavailable. Health derivation runs only after an
+adapter observation batch is complete, avoiding transient health conclusions from
+half-updated state.

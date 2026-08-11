@@ -3,11 +3,18 @@ import unittest
 from pathlib import Path
 
 from personal_cic.core.config import HealthThresholds
-from personal_cic.core.events import ComponentUpdated, EventBus, EventJournal
+from personal_cic.core.events import (
+    ComponentUpdated,
+    EventBus,
+    EventJournal,
+    ObservationCycleCompleted,
+)
+from personal_cic.core.observations import ObservationAvailability
 from personal_cic.core.world import WorldState
 from personal_cic.core.world.components import (
     ComputeState,
     HealthState,
+    HealthStatus,
     MemoryState,
     StorageState,
     WifiLinkState,
@@ -34,22 +41,36 @@ class VerticalSliceTests(unittest.TestCase):
         self.world = WorldState(self.events)
         self.world.ensure_entity("node", "Test Node")
         self.health = HealthSystem(self.world, THRESHOLDS)
-        self.events.subscribe(ComponentUpdated, self.health.on_component_updated)
+        self.events.subscribe(
+            ObservationCycleCompleted,
+            self.health.on_observation_cycle_completed,
+        )
+
+    def _derive(self):
+        self.events.publish(
+            ObservationCycleCompleted(
+                entity_id="node",
+                adapter_id="test",
+                availability=ObservationAvailability.CURRENT,
+            )
+        )
 
     def test_nominal_health_is_derived_from_components(self):
         self.world.upsert_component("node", ComputeState(12.0, 4, 0.3, 0.075))
         self.world.upsert_component("node", MemoryState(16_000, 10_000, 37.5))
         self.world.upsert_component("node", StorageState("/", 100_000, 60_000, 40.0))
+        self._derive()
         health = self.world.entities["node"].get(HealthState)
-        self.assertEqual(health.status, "nominal")
+        self.assertEqual(health.status, HealthStatus.NOMINAL)
 
     def test_bad_wifi_drives_critical_health(self):
         self.world.upsert_component(
             "node",
             WifiLinkState("wlan0", False, None, None, None, None, None, None),
         )
+        self._derive()
         health = self.world.entities["node"].get(HealthState)
-        self.assertEqual(health.status, "critical")
+        self.assertEqual(health.status, HealthStatus.CRITICAL)
         self.assertIn("Wi-Fi disconnected", health.reasons)
 
     def test_query_is_component_based(self):
@@ -64,6 +85,7 @@ class VerticalSliceTests(unittest.TestCase):
             self.events.observe_all(journal.record)
 
             self.world.upsert_component("node", ComputeState(12.0, 4, 0.3, 0.075))
+            self._derive()
             lines = journal_path.read_text(encoding="utf-8").splitlines()
 
             self.assertIn('"component_name":"ComputeState"', lines[0])

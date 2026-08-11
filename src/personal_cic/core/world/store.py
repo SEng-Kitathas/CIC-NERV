@@ -4,12 +4,12 @@ import json
 from typing import Any, Literal
 
 from personal_cic.core.events import ComponentUpdated, EventBus
-from .codec import decode_component
+from .codec import decode_component, encode_value
 from .entity import Entity
 
 
 class WorldState:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, events: EventBus) -> None:
         self.events = events
@@ -54,7 +54,7 @@ class WorldState:
     @staticmethod
     def _component_json(component: Any) -> Any:
         if is_dataclass(component):
-            return asdict(component)
+            return {key: encode_value(value) for key, value in asdict(component).items()}
         return repr(component)
 
     def snapshot(self) -> dict[str, Any]:

@@ -5,6 +5,7 @@ from personal_cic.core.world.components import (
     ComputeState,
     HealthState,
     MemoryState,
+    ObservationState,
     StorageState,
     TemperatureState,
     UptimeState,
@@ -41,6 +42,11 @@ def telemetry_significance(
 
     if isinstance(current, HealthState):
         return "material"
+
+    if isinstance(current, ObservationState) and isinstance(previous, ObservationState):
+        semantic_old = (previous.availability, previous.reasons)
+        semantic_new = (current.availability, current.reasons)
+        return "material" if semantic_old != semantic_new else "sample"
 
     if isinstance(current, UptimeState):
         return "sample"
@@ -111,21 +117,27 @@ def telemetry_significance(
             previous.interface,
             previous.connected,
             previous.ssid,
-            previous.frequency_mhz,
             previous.ipv4,
         )
         structural_new = (
             current.interface,
             current.connected,
             current.ssid,
-            current.frequency_mhz,
             current.ipv4,
         )
         if structural_old != structural_new:
             return "material"
 
+        # Frequency/channel and bitrate are radio telemetry, not durable
+        # operational meaning by themselves. Normal AP band steering in the
+        # Engage soak test moved 5 GHz -> 2.4 GHz -> 5 GHz without a link loss.
+        # A future RF/health model may derive a semantic band transition.
+
+        # Missing signal on an otherwise structurally stable link is likewise
+        # observation-quality degradation. ObservationState owns that truth;
+        # do not create a false durable WifiLinkState transition for None.
         if previous.signal_dbm is None or current.signal_dbm is None:
-            return "material" if previous.signal_dbm != current.signal_dbm else "sample"
+            return "sample"
 
         old_band = _low_band(previous.signal_dbm, thresholds.wifi_signal_warning_dbm)
         new_band = _low_band(current.signal_dbm, thresholds.wifi_signal_warning_dbm)
