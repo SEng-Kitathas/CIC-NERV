@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2 — Continuity and Causal Journal
+
+- Runtime now hydrates `state/world.json` before beginning a new process lifetime.
+- State hydration is silent: restoring embodiment does not fabricate events.
+- `RuntimeStarted` is the first new durable event after hydration and reports restored entity count.
+- Event observers now record a cause before typed systems may publish derived effects.
+- Health-derived events therefore follow their triggering component event in the journal.
+- Normal CPU, temperature, storage, memory, signal, and bitrate churn remains live world state but is not durable history.
+- Added temperature warning/critical health thresholds.
+- Added schema version to world snapshots and typed component decoding for restart continuity.
+
 ## 0.2.1 — Event Hygiene
 
 - Separated current-state sampling from durable operational event significance.

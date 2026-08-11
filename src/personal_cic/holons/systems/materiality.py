@@ -13,7 +13,7 @@ from personal_cic.core.world.components import (
 )
 
 
-def _band(value: float, warning: float, critical: float) -> int:
+def _high_band(value: float, warning: float, critical: float) -> int:
     if value >= critical:
         return 2
     if value >= warning:
@@ -21,79 +21,87 @@ def _band(value: float, warning: float, critical: float) -> int:
     return 0
 
 
+def _low_band(value: int, warning: int) -> int:
+    return 1 if value <= warning else 0
+
+
 def telemetry_significance(
     previous: Any,
     current: Any,
     thresholds: HealthThresholds,
 ) -> str:
-    """Classify an observation as durable operational change or transient sample."""
+    """Separate live sampling from durable operational history.
+
+    Raw telemetry remains current in WorldState. The event journal records semantic
+    boundary crossings and structural changes, not normal workload/radio churn.
+    """
 
     if previous is None:
         return "material"
 
-    # Health is already derived semantic state; any change matters.
     if isinstance(current, HealthState):
         return "material"
 
-    # Uptime belongs in current world state but not in the durable event history.
     if isinstance(current, UptimeState):
         return "sample"
 
     if isinstance(current, ComputeState) and isinstance(previous, ComputeState):
-        old_band = _band(
+        old_band = _high_band(
             previous.cpu_percent,
             thresholds.cpu_warning_percent,
             thresholds.cpu_critical_percent,
         )
-        new_band = _band(
+        new_band = _high_band(
             current.cpu_percent,
             thresholds.cpu_warning_percent,
             thresholds.cpu_critical_percent,
         )
-        if old_band != new_band or abs(current.cpu_percent - previous.cpu_percent) >= 10:
-            return "material"
-        return "sample"
+        return "material" if old_band != new_band else "sample"
 
     if isinstance(current, MemoryState) and isinstance(previous, MemoryState):
-        old_band = _band(
+        old_band = _high_band(
             previous.used_percent,
             thresholds.memory_warning_percent,
             thresholds.memory_critical_percent,
         )
-        new_band = _band(
+        new_band = _high_band(
             current.used_percent,
             thresholds.memory_warning_percent,
             thresholds.memory_critical_percent,
         )
-        if old_band != new_band or abs(current.used_percent - previous.used_percent) >= 5:
-            return "material"
-        return "sample"
+        return "material" if old_band != new_band else "sample"
 
     if isinstance(current, StorageState) and isinstance(previous, StorageState):
-        old_band = _band(
+        if current.mountpoint != previous.mountpoint:
+            return "material"
+        old_band = _high_band(
             previous.used_percent,
             thresholds.storage_warning_percent,
             thresholds.storage_critical_percent,
         )
-        new_band = _band(
+        new_band = _high_band(
             current.used_percent,
             thresholds.storage_warning_percent,
             thresholds.storage_critical_percent,
         )
-        if (
-            old_band != new_band
-            or current.mountpoint != previous.mountpoint
-            or abs(current.used_percent - previous.used_percent) >= 1
-        ):
-            return "material"
-        return "sample"
+        return "material" if old_band != new_band else "sample"
 
     if isinstance(current, TemperatureState) and isinstance(previous, TemperatureState):
         if current.source != previous.source:
             return "material"
         if current.celsius is None or previous.celsius is None:
             return "material" if current.celsius != previous.celsius else "sample"
-        return "material" if abs(current.celsius - previous.celsius) >= 3 else "sample"
+        old_band = _high_band(
+            previous.celsius,
+            thresholds.temperature_warning_c,
+            thresholds.temperature_critical_c,
+        )
+        new_band = _high_band(
+            current.celsius,
+            thresholds.temperature_warning_c,
+            thresholds.temperature_critical_c,
+        )
+        return "material" if old_band != new_band else "sample"
 
     if isinstance(current, UsbDeviceState) and isinstance(previous, UsbDeviceState):
         return "material" if current != previous else "sample"
@@ -116,11 +124,11 @@ def telemetry_significance(
         if structural_old != structural_new:
             return "material"
 
-        if current.signal_dbm is not None and previous.signal_dbm is not None:
-            if abs(current.signal_dbm - previous.signal_dbm) >= 5:
-                return "material"
+        if previous.signal_dbm is None or current.signal_dbm is None:
+            return "material" if previous.signal_dbm != current.signal_dbm else "sample"
 
-        # Link-rate churn is useful live telemetry, not an operational event.
-        return "sample"
+        old_band = _low_band(previous.signal_dbm, thresholds.wifi_signal_warning_dbm)
+        new_band = _low_band(current.signal_dbm, thresholds.wifi_signal_warning_dbm)
+        return "material" if old_band != new_band else "sample"
 
     return "material"

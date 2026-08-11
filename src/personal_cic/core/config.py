@@ -29,6 +29,8 @@ class HealthThresholds:
     memory_critical_percent: float
     storage_warning_percent: float
     storage_critical_percent: float
+    temperature_warning_c: float
+    temperature_critical_c: float
     wifi_signal_warning_dbm: int
 
     @classmethod
@@ -41,5 +43,7 @@ class HealthThresholds:
             memory_critical_percent=float(data["memory_critical_percent"]),
             storage_warning_percent=float(data["storage_warning_percent"]),
             storage_critical_percent=float(data["storage_critical_percent"]),
+            temperature_warning_c=float(data["temperature_warning_c"]),
+            temperature_critical_c=float(data["temperature_critical_c"]),
             wifi_signal_warning_dbm=int(data["wifi_signal_warning_dbm"]),
         )

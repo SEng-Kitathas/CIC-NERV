@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-from personal_cic.bootstrap import collect_once, create_context
+from personal_cic.bootstrap import collect_once, create_context, reconcile_topology
 from personal_cic.ui.main.console import render
 
 
@@ -19,9 +19,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    context = create_context(health_config_path=Path(args.health_config))
+    state_path = Path(args.state)
+    context = create_context(
+        health_config_path=Path(args.health_config),
+        restore_state_path=state_path,
+    )
+    reconcile_topology(context)
     collect_once(context)
-    context.world.write_json(Path(args.state))
+    context.world.write_json(state_path)
     render(context.world, context.events.published_count)
 
 

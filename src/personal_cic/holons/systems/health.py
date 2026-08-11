@@ -6,6 +6,7 @@ from personal_cic.core.world.components import (
     HealthState,
     MemoryState,
     StorageState,
+    TemperatureState,
     UsbDeviceState,
     WifiLinkState,
 )
@@ -16,6 +17,7 @@ class HealthSystem:
         ComputeState.__name__,
         MemoryState.__name__,
         StorageState.__name__,
+        TemperatureState.__name__,
         UsbDeviceState.__name__,
         WifiLinkState.__name__,
     }
@@ -56,6 +58,13 @@ class HealthSystem:
             elif storage.used_percent >= t.storage_warning_percent:
                 warning.append(f"storage {storage.used_percent:.0f}%")
 
+        temperature = entity.get(TemperatureState)
+        if temperature and temperature.celsius is not None:
+            if temperature.celsius >= t.temperature_critical_c:
+                critical.append(f"temperature {temperature.celsius:.0f} C")
+            elif temperature.celsius >= t.temperature_warning_c:
+                warning.append(f"temperature {temperature.celsius:.0f} C")
+
         usb = entity.get(UsbDeviceState)
         if usb:
             if not usb.present:
@@ -83,6 +92,7 @@ class HealthSystem:
                 ComputeState,
                 MemoryState,
                 StorageState,
+                TemperatureState,
                 UsbDeviceState,
                 WifiLinkState,
             )

@@ -5,7 +5,7 @@ import signal
 import threading
 import time
 
-from personal_cic.bootstrap import collect_once, create_context
+from personal_cic.bootstrap import collect_once, create_context, reconcile_topology
 from personal_cic.core.config import RuntimeConfig
 from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted, RuntimeStopping
 
@@ -20,10 +20,10 @@ class PersistentRuntime:
         self.runtime_config = RuntimeConfig.load(runtime_config_path)
         self.events = EventBus()
         self.journal = EventJournal(self.runtime_config.event_journal_path)
-        self.events.subscribe_all(self.journal.record)
         self.context = create_context(
             events=self.events,
             health_config_path=health_config_path,
+            restore_state_path=self.runtime_config.state_path,
         )
         self.stop_event = threading.Event()
         self.stop_reason = "requested"
@@ -44,12 +44,17 @@ class PersistentRuntime:
             self._last_snapshot_monotonic = now
 
     def run(self) -> None:
+        # Attach the durable observer only after silent state hydration. The first
+        # new event of this process lifetime is therefore RuntimeStarted.
+        self.events.observe_all(self.journal.record)
         self.events.publish(
             RuntimeStarted(
                 pid=os.getpid(),
                 config_path=str(self.runtime_config_path),
+                restored_entities=self.context.restored_entities,
             )
         )
+        reconcile_topology(self.context)
 
         try:
             while not self.stop_event.is_set():

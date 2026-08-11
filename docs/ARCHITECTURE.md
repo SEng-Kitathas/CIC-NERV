@@ -58,3 +58,17 @@ Those remain in adapters, systems, presentation, and future control holons.
 - Research code stays out of runtime.
 - Odd hardware gets adapters, not exceptions in core.
 - Process supervision is delegated to systemd rather than reimplemented.
+
+
+## 0.2.2 continuity invariant
+
+Embodiment must survive process death. `state/world.json` is therefore read as well as written.
+A restarted runtime silently restores the previous typed world before sampling current reality.
+Only differences between embodied prior state and new observations can become new events.
+
+The durable journal is causal, not merely chronological by call stack accident: observers record
+an event before typed systems may derive and publish consequences from it.
+
+High-frequency telemetry and durable history are intentionally separate concerns. WorldState is
+current truth; the event journal is semantic operational memory. A future metrics/time-series
+store may preserve high-resolution telemetry without corrupting event meaning.

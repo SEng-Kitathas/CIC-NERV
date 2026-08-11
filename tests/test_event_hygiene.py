@@ -5,7 +5,9 @@ from pathlib import Path
 from personal_cic.core.config import HealthThresholds
 from personal_cic.core.events import ComponentUpdated, EventJournal
 from personal_cic.core.world.components import (
+    ComputeState,
     StorageState,
+    TemperatureState,
     UptimeState,
     WifiLinkState,
 )
@@ -19,6 +21,8 @@ THRESHOLDS = HealthThresholds(
     memory_critical_percent=95,
     storage_warning_percent=90,
     storage_critical_percent=97,
+    temperature_warning_c=80,
+    temperature_critical_c=90,
     wifi_signal_warning_dbm=-75,
 )
 
@@ -33,18 +37,32 @@ class EventHygieneTests(unittest.TestCase):
     def test_tiny_storage_free_space_change_is_sample(self):
         old = StorageState("/", 100_000, 60_000, 40.0)
         new = StorageState("/", 100_000, 59_984, 40.0)
-        self.assertEqual(
-            telemetry_significance(old, new, THRESHOLDS),
-            "sample",
-        )
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "sample")
+
+    def test_normal_cpu_swing_is_sample(self):
+        old = ComputeState(10.0, 4, 0.3, 0.075)
+        new = ComputeState(40.0, 4, 1.0, 0.25)
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "sample")
+
+    def test_cpu_health_band_crossing_is_material(self):
+        old = ComputeState(40.0, 4, 1.0, 0.25)
+        new = ComputeState(85.0, 4, 3.0, 0.75)
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "material")
+
+    def test_normal_temperature_excursion_is_sample(self):
+        old = TemperatureState(44.0, "coretemp:Package id 0")
+        new = TemperatureState(67.0, "coretemp:Package id 0")
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "sample")
+
+    def test_temperature_warning_crossing_is_material(self):
+        old = TemperatureState(67.0, "coretemp:Package id 0")
+        new = TemperatureState(82.0, "coretemp:Package id 0")
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "material")
 
     def test_wifi_disconnect_is_material(self):
         old = WifiLinkState("wlan0", True, "home", 5220, -65, 300.0, 300.0, "192.168.1.2/24")
         new = WifiLinkState("wlan0", False, None, None, None, None, None, None)
-        self.assertEqual(
-            telemetry_significance(old, new, THRESHOLDS),
-            "material",
-        )
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "material")
 
     def test_journal_skips_sample_component_updates(self):
         with tempfile.TemporaryDirectory() as tmp:

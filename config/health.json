@@ -5,5 +5,7 @@
   "memory_critical_percent": 95.0,
   "storage_warning_percent": 90.0,
   "storage_critical_percent": 97.0,
+  "temperature_warning_c": 80.0,
+  "temperature_critical_c": 90.0,
   "wifi_signal_warning_dbm": -75
 }

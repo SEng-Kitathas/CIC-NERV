@@ -28,27 +28,24 @@ class RuntimeContext:
     host_adapter: LinuxHostAdapter
     tenda_adapter: TendaU11ProAdapter
     thresholds: HealthThresholds
+    restored_entities: int = 0
 
 
 def create_context(
     *,
     events: EventBus | None = None,
     health_config_path: Path = Path("config/health.json"),
+    restore_state_path: Path | None = None,
 ) -> RuntimeContext:
     event_bus = events or EventBus()
     world = WorldState(event_bus)
+    restored_entities = 0
+    if restore_state_path is not None:
+        restored_entities = world.hydrate_json(restore_state_path)
+
     thresholds = HealthThresholds.load(health_config_path)
     health = HealthSystem(world, thresholds)
     event_bus.subscribe(ComponentUpdated, health.on_component_updated)
-
-    world.ensure_entity(ENGAGE_ID, "HP Engage One Model 145")
-    world.ensure_entity(TENDA_ID, "Tenda U11 Pro")
-
-    for component in (CICNode(), LinuxHost()):
-        world.upsert_component(ENGAGE_ID, component)
-
-    for component in (USBDevice(), WiFiRadio(), RFObserver()):
-        world.upsert_component(TENDA_ID, component)
 
     return RuntimeContext(
         events=event_bus,
@@ -56,7 +53,19 @@ def create_context(
         host_adapter=LinuxHostAdapter(),
         tenda_adapter=TendaU11ProAdapter(),
         thresholds=thresholds,
+        restored_entities=restored_entities,
     )
+
+
+def reconcile_topology(context: RuntimeContext) -> None:
+    context.world.ensure_entity(ENGAGE_ID, "HP Engage One Model 145")
+    context.world.ensure_entity(TENDA_ID, "Tenda U11 Pro")
+
+    for component in (CICNode(), LinuxHost()):
+        context.world.upsert_component(ENGAGE_ID, component)
+
+    for component in (USBDevice(), WiFiRadio(), RFObserver()):
+        context.world.upsert_component(TENDA_ID, component)
 
 
 def _observe(context: RuntimeContext, entity_id: str, component: object) -> None:

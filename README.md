@@ -91,3 +91,11 @@ python -m unittest discover -s tests -v
 The runtime samples current state frequently, but the durable event journal records only
 operationally meaningful changes. Current world state remains fresh without turning
 `logs/events.jsonl` into a five-second telemetry dump.
+
+
+## 0.2.2 restart continuity
+
+The runtime now rehydrates `state/world.json` before starting a new process lifetime. On restart,
+unchanged topology and ordinary telemetry do not masquerade as newly discovered facts.
+`RuntimeStarted` reports how many entities were restored, and the event journal records causes
+before derived health effects.

@@ -23,6 +23,7 @@ class ComponentUpdated:
 class RuntimeStarted:
     pid: int
     config_path: str
+    restored_entities: int
     event_id: str = field(default_factory=lambda: str(uuid4()))
     occurred_at: str = field(default_factory=utc_now_iso)
 

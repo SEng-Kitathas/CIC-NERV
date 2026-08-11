@@ -4,10 +4,13 @@ import json
 from typing import Any, Literal
 
 from personal_cic.core.events import ComponentUpdated, EventBus
+from .codec import decode_component
 from .entity import Entity
 
 
 class WorldState:
+    SCHEMA_VERSION = 1
+
     def __init__(self, events: EventBus) -> None:
         self.events = events
         self.entities: dict[str, Entity] = {}
@@ -17,6 +20,8 @@ class WorldState:
         if entity is None:
             entity = Entity(entity_id=entity_id, label=label)
             self.entities[entity_id] = entity
+        else:
+            entity.label = label
         return entity
 
     def upsert_component(
@@ -54,6 +59,7 @@ class WorldState:
 
     def snapshot(self) -> dict[str, Any]:
         return {
+            "schema_version": self.SCHEMA_VERSION,
             "entities": {
                 entity_id: {
                     "label": entity.label,
@@ -63,7 +69,7 @@ class WorldState:
                     },
                 }
                 for entity_id, entity in sorted(self.entities.items())
-            }
+            },
         }
 
     def write_json(self, path: Path) -> None:
@@ -71,3 +77,25 @@ class WorldState:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(self.snapshot(), indent=2) + "\n", encoding="utf-8")
         tmp.replace(path)
+
+    def hydrate_json(self, path: Path) -> int:
+        """Restore the last embodied world without emitting synthetic events.
+
+        Unknown future component types are ignored rather than preventing startup.
+        Returns the number of restored entities.
+        """
+        if not path.exists():
+            return 0
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        restored = 0
+        for entity_id, entity_data in data.get("entities", {}).items():
+            entity = self.ensure_entity(entity_id, entity_data.get("label", entity_id))
+            for name, payload in entity_data.get("components", {}).items():
+                if not isinstance(payload, dict):
+                    continue
+                component = decode_component(name, payload)
+                if component is not None:
+                    entity.set_component(component)
+            restored += 1
+        return restored

@@ -22,6 +22,8 @@ THRESHOLDS = HealthThresholds(
     memory_critical_percent=95,
     storage_warning_percent=90,
     storage_critical_percent=97,
+    temperature_warning_c=80,
+    temperature_critical_c=90,
     wifi_signal_warning_dbm=-75,
 )
 
@@ -55,22 +57,17 @@ class VerticalSliceTests(unittest.TestCase):
         matches = self.world.query(ComputeState)
         self.assertEqual([entity.entity_id for entity in matches], ["node"])
 
-    def test_event_journal_is_append_only_jsonl(self):
+    def test_journal_records_cause_before_derived_health(self):
         with tempfile.TemporaryDirectory() as tmp:
             journal_path = Path(tmp) / "events.jsonl"
             journal = EventJournal(journal_path)
-            self.events.subscribe_all(journal.record)
+            self.events.observe_all(journal.record)
 
             self.world.upsert_component("node", ComputeState(12.0, 4, 0.3, 0.075))
-            first_size = journal_path.stat().st_size
-            self.world.upsert_component("node", MemoryState(16_000, 10_000, 37.5))
-            second_size = journal_path.stat().st_size
-
-            self.assertGreater(first_size, 0)
-            self.assertGreater(second_size, first_size)
             lines = journal_path.read_text(encoding="utf-8").splitlines()
-            self.assertGreaterEqual(len(lines), 2)
-            self.assertIn('"event_type":"ComponentUpdated"', lines[0])
+
+            self.assertIn('"component_name":"ComputeState"', lines[0])
+            self.assertIn('"component_name":"HealthState"', lines[1])
 
 
 if __name__ == "__main__":
