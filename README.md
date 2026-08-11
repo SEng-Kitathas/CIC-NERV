@@ -135,3 +135,7 @@ JSON projection:
 ```text
 GET http://127.0.0.1:8765/api/v1/systems
 ```
+
+## 0.3.1 — World Awareness
+
+The World page is available at `http://127.0.0.1:8765/world`. Remote weather/alert providers are observed by CIC adapters and projected from WorldState; the browser never calls them directly.

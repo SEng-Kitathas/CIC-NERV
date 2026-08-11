@@ -24,12 +24,11 @@ class HealthSystem:
         self.evaluate(event.entity_id)
 
     def evaluate(self, entity_id: str) -> None:
-        entity = self.world.entities[entity_id]
         t = self.thresholds
         critical: list[str] = []
         warning: list[str] = []
 
-        observation = entity.get(ObservationState)
+        observation = self.world.get_component(entity_id, ObservationState)
         if observation and observation.availability is ObservationAvailability.UNAVAILABLE:
             reason = "telemetry unavailable"
             if observation.reasons:
@@ -43,76 +42,59 @@ class HealthSystem:
             detail = "; ".join(observation.reasons) or "partial telemetry"
             warning.append(f"telemetry degraded: {detail}")
 
-        compute = entity.get(ComputeState)
+        compute = self.world.get_component(entity_id, ComputeState)
         if compute:
             if compute.cpu_percent >= t.cpu_critical_percent:
                 critical.append(f"CPU {compute.cpu_percent:.0f}%")
             elif compute.cpu_percent >= t.cpu_warning_percent:
                 warning.append(f"CPU {compute.cpu_percent:.0f}%")
 
-        memory = entity.get(MemoryState)
+        memory = self.world.get_component(entity_id, MemoryState)
         if memory:
             if memory.used_percent >= t.memory_critical_percent:
                 critical.append(f"memory {memory.used_percent:.0f}%")
             elif memory.used_percent >= t.memory_warning_percent:
                 warning.append(f"memory {memory.used_percent:.0f}%")
 
-        storage = entity.get(StorageState)
+        storage = self.world.get_component(entity_id, StorageState)
         if storage:
             if storage.used_percent >= t.storage_critical_percent:
                 critical.append(f"storage {storage.used_percent:.0f}%")
             elif storage.used_percent >= t.storage_warning_percent:
                 warning.append(f"storage {storage.used_percent:.0f}%")
 
-        temperature = entity.get(TemperatureState)
+        temperature = self.world.get_component(entity_id, TemperatureState)
         if temperature and temperature.celsius is not None:
             if temperature.celsius >= t.temperature_critical_c:
                 critical.append(f"temperature {temperature.celsius:.0f} C")
             elif temperature.celsius >= t.temperature_warning_c:
                 warning.append(f"temperature {temperature.celsius:.0f} C")
 
-        usb = entity.get(UsbDeviceState)
+        usb = self.world.get_component(entity_id, UsbDeviceState)
         if usb:
             if not usb.present:
                 critical.append("USB radio absent")
             elif usb.mode != "wifi":
                 warning.append(f"USB radio mode={usb.mode}")
 
-        wifi = entity.get(WifiLinkState)
+        wifi = self.world.get_component(entity_id, WifiLinkState)
         if wifi:
             if not wifi.connected:
                 critical.append("Wi-Fi disconnected")
-            elif (
-                wifi.signal_dbm is not None
-                and wifi.signal_dbm <= t.wifi_signal_warning_dbm
-            ):
+            elif wifi.signal_dbm is not None and wifi.signal_dbm <= t.wifi_signal_warning_dbm:
                 warning.append(f"Wi-Fi signal {wifi.signal_dbm} dBm")
 
         if critical:
             proposed = HealthState(HealthStatus.CRITICAL, tuple(critical + warning))
         elif warning:
             proposed = HealthState(HealthStatus.WARNING, tuple(warning))
-        elif any(
-            entity.get(component_type) is not None
-            for component_type in (
-                ComputeState,
-                MemoryState,
-                StorageState,
-                TemperatureState,
-                UsbDeviceState,
-                WifiLinkState,
-            )
-        ):
+        elif any(value is not None for value in (compute, memory, storage, temperature, usb, wifi)):
             proposed = HealthState(HealthStatus.NOMINAL, ())
         else:
-            proposed = HealthState(
-                HealthStatus.UNKNOWN,
-                ("no health-bearing telemetry",),
-            )
+            proposed = HealthState(HealthStatus.UNKNOWN, ("no health-bearing telemetry",))
 
         self._set_health(entity_id, proposed)
 
     def _set_health(self, entity_id: str, proposed: HealthState) -> None:
-        entity = self.world.entities[entity_id]
-        if entity.get(HealthState) != proposed:
+        if self.world.get_component(entity_id, HealthState) != proposed:
             self.world.upsert_component(entity_id, proposed)

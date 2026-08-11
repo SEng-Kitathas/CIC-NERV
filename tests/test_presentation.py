@@ -17,10 +17,14 @@ from personal_cic.core.world.components import (
     UptimeState,
     UsbDeviceState,
     WifiLinkState,
+    WeatherAlertState,
+    WeatherForecastState,
+    WeatherState,
 )
 from personal_cic.presentation import (
     PresentationServer,
     build_systems_projection,
+    build_world_projection,
 )
 
 
@@ -180,6 +184,37 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("READ-ONLY", body)
         self.assertIn("/api/v1/systems", body)
 
+    def test_world_projection_exposes_provider_freshness_without_inventing_internet_or_health(self):
+        self.world.ensure_entity("local-weather", "Local Weather")
+        self.world.ensure_entity("local-weather-alerts", "Local Weather Alerts")
+        self.world.upsert_component("local-weather", WeatherState("Test", "Open-Meteo", "2026-08-11T18:00", "America/New_York", 88.0, 90.0, 55.0, 0.0, 2, 40.0, 5.0, 180.0, 9.0))
+        self.world.upsert_component("local-weather", WeatherForecastState("Test", "Open-Meteo", "America/New_York", "2026-08-11", 91.0, 72.0, 40.0, "06:39", "20:18"))
+        self.world.upsert_component("local-weather", ObservationState("openmeteo.weather", ObservationAvailability.CURRENT, "2026-08-11T20:00:00+00:00", "2026-08-11T20:00:00+00:00", ()))
+        self.world.upsert_component("local-weather-alerts", WeatherAlertState("Test", "National Weather Service", 0, None, "2026-08-11T20:00:00+00:00", ()))
+        self.world.upsert_component("local-weather-alerts", ObservationState("nws.alerts", ObservationAvailability.CURRENT, "2026-08-11T20:00:00+00:00", "2026-08-11T20:00:00+00:00", ()))
+        projection = build_world_projection(self.world)
+        self.assertEqual(projection["weather"]["condition"], "Partly cloudy")
+        self.assertTrue(projection["alerts"]["authoritative_now"])
+        self.assertNotIn("internet", projection)
+        self.assertNotIn("health", projection["weather"])
+
+    def test_http_world_endpoint_and_page_are_read_only(self):
+        self.world.ensure_entity("local-weather", "Local Weather")
+        self.world.ensure_entity("local-weather-alerts", "Local Weather Alerts")
+        server = PresentationServer(world=self.world, host="127.0.0.1", port=0, runtime_metadata=lambda: {})
+        server.start(); self.addCleanup(server.stop)
+        with urlopen(f"http://127.0.0.1:{server.bound_port}/world", timeout=2) as response:
+            body=response.read().decode("utf-8")
+        self.assertIn("PERSONAL CIC // WORLD", body)
+        self.assertIn("Open-Meteo", body)
+        self.assertIn("CC BY 4.0", body)
+        with urlopen(f"http://127.0.0.1:{server.bound_port}/api/v1/world", timeout=2) as response:
+            payload=json.loads(response.read())
+        self.assertEqual(payload["presentation"]["mode"], "read-only")
+        request=Request(f"http://127.0.0.1:{server.bound_port}/api/v1/world", method="POST", data=b"{}")
+        with self.assertRaises(HTTPError) as captured:
+            urlopen(request, timeout=2)
+        self.assertEqual(captured.exception.code, 405)
 
 if __name__ == "__main__":
     unittest.main()

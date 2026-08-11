@@ -11,6 +11,9 @@ from personal_cic.core.world.components import (
     UptimeState,
     UsbDeviceState,
     WifiLinkState,
+    WeatherAlertState,
+    WeatherForecastState,
+    WeatherState,
 )
 
 
@@ -111,6 +114,55 @@ def telemetry_significance(
 
     if isinstance(current, UsbDeviceState) and isinstance(previous, UsbDeviceState):
         return "material" if current != previous else "sample"
+
+    if isinstance(current, WeatherState) and isinstance(previous, WeatherState):
+        structural_old = (
+            previous.provider,
+            previous.location_label,
+            previous.provider_timezone,
+            previous.weather_code,
+            bool(previous.precipitation_in and previous.precipitation_in > 0),
+        )
+        structural_new = (
+            current.provider,
+            current.location_label,
+            current.provider_timezone,
+            current.weather_code,
+            bool(current.precipitation_in and current.precipitation_in > 0),
+        )
+        return "material" if structural_old != structural_new else "sample"
+
+    if isinstance(current, WeatherForecastState) and isinstance(previous, WeatherForecastState):
+        structural_old = (
+            previous.provider,
+            previous.location_label,
+            previous.provider_timezone,
+            previous.forecast_date,
+        )
+        structural_new = (
+            current.provider,
+            current.location_label,
+            current.provider_timezone,
+            current.forecast_date,
+        )
+        return "material" if structural_old != structural_new else "sample"
+
+    if isinstance(current, WeatherAlertState) and isinstance(previous, WeatherAlertState):
+        semantic_old = (
+            previous.location_label,
+            previous.provider,
+            previous.active_count,
+            previous.highest_severity,
+            previous.alerts,
+        )
+        semantic_new = (
+            current.location_label,
+            current.provider,
+            current.active_count,
+            current.highest_severity,
+            current.alerts,
+        )
+        return "material" if semantic_old != semantic_new else "sample"
 
     if isinstance(current, WifiLinkState) and isinstance(previous, WifiLinkState):
         structural_old = (

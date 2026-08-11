@@ -35,3 +35,11 @@ A residual becomes P0 only when it creates a demonstrated correctness, authority
 - **Authority integrity:** the presentation server exposes GET/HEAD only; mutation verbs are rejected.
 - **Scoped authority:** WLAN association is rendered as WLAN state, not promoted to Internet capability.
 - **Concurrency ownership:** `WorldState` owns synchronization introduced by the concurrent presentation reader.
+
+## 0.3.1 conformance
+
+- **Remote observation ≠ reality:** provider payloads retain provider timestamps and local retrieval freshness.
+- **Failure honesty:** provider failure preserves last-known domain value and degrades ObservationState instead of inventing weather/alert state.
+- **Semantic home:** remote polling lives in typed adapters/runtime, never in browser code.
+- **Timescale integrity:** slow remote I/O is isolated from the local 5-second observation loop.
+- **Negative evidence:** a successful NWS response containing zero active alerts is legitimate current negative evidence; an unavailable NWS request is not.

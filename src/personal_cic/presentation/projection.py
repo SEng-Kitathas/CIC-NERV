@@ -172,3 +172,93 @@ def build_systems_projection(
             },
         },
     }
+
+
+_WEATHER_CODES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Rime fog",
+    51: "Light drizzle",
+    53: "Drizzle",
+    55: "Heavy drizzle",
+    56: "Light freezing drizzle",
+    57: "Freezing drizzle",
+    61: "Light rain",
+    63: "Rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Freezing rain",
+    71: "Light snow",
+    73: "Snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Light showers",
+    81: "Showers",
+    82: "Heavy showers",
+    85: "Light snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with hail",
+    99: "Severe thunderstorm with hail",
+}
+
+
+def build_world_projection(world: WorldState) -> dict[str, Any]:
+    """Project remote-provider observations without promoting them beyond their scope."""
+
+    snapshot = world.snapshot()
+    entities = snapshot.get("entities", {})
+    weather_entity = entities.get("local-weather", {})
+    alerts_entity = entities.get("local-weather-alerts", {})
+
+    weather = _component(weather_entity, "WeatherState") or {}
+    forecast = _component(weather_entity, "WeatherForecastState") or {}
+    weather_obs = _component(weather_entity, "ObservationState") or {}
+
+    alerts = _component(alerts_entity, "WeatherAlertState") or {}
+    alerts_obs = _component(alerts_entity, "ObservationState") or {}
+
+    weather_code = weather.get("weather_code")
+    return {
+        "api_version": 1,
+        "presentation": {
+            "mode": "read-only",
+            "generated_at": _now_iso(),
+            "world_schema_version": snapshot.get("schema_version"),
+        },
+        "location": {
+            "label": weather.get("location_label")
+            or alerts.get("location_label")
+            or "configured local area",
+        },
+        "weather": {
+            **weather,
+            "condition": _WEATHER_CODES.get(weather_code, "Unknown")
+            if weather_code is not None
+            else None,
+            "observation": {
+                "availability": weather_obs.get("availability", "unavailable"),
+                "adapter_id": weather_obs.get("adapter_id"),
+                "checked_at": weather_obs.get("checked_at"),
+                "last_success_at": weather_obs.get("last_success_at"),
+                "freshness_seconds": _freshness_seconds(weather_obs.get("checked_at")),
+                "reasons": weather_obs.get("reasons", []),
+            },
+            "forecast": forecast,
+        },
+        "alerts": {
+            **alerts,
+            "authoritative_now": alerts_obs.get("availability") == "current",
+            "observation": {
+                "availability": alerts_obs.get("availability", "unavailable"),
+                "adapter_id": alerts_obs.get("adapter_id"),
+                "checked_at": alerts_obs.get("checked_at"),
+                "last_success_at": alerts_obs.get("last_success_at"),
+                "freshness_seconds": _freshness_seconds(alerts_obs.get("checked_at")),
+                "reasons": alerts_obs.get("reasons", []),
+            },
+        },
+    }

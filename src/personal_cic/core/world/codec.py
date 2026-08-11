@@ -19,6 +19,10 @@ from .components import (
     UsbDeviceState,
     WiFiRadio,
     WifiLinkState,
+    WeatherAlertState,
+    WeatherAlertSummary,
+    WeatherForecastState,
+    WeatherState,
 )
 
 
@@ -39,6 +43,9 @@ COMPONENT_TYPES = {
         WifiLinkState,
         ObservationState,
         HealthState,
+        WeatherState,
+        WeatherForecastState,
+        WeatherAlertState,
     )
 }
 
@@ -65,6 +72,12 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
         values["status"] = HealthStatus(values["status"])
         if isinstance(values.get("reasons"), list):
             values["reasons"] = tuple(values["reasons"])
+    elif component_type is WeatherAlertState:
+        values["alerts"] = tuple(
+            WeatherAlertSummary(**item)
+            for item in values.get("alerts", [])
+            if isinstance(item, dict)
+        )
     elif component_type is ObservationState:
         values["availability"] = ObservationAvailability(values["availability"])
         if isinstance(values.get("reasons"), list):

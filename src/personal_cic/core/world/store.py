@@ -52,6 +52,11 @@ class WorldState:
             )
             return True
 
+    def get_component(self, entity_id: str, component_type: type):
+        with self._lock:
+            entity = self.entities.get(entity_id)
+            return None if entity is None else entity.get(component_type)
+
     def query(self, *component_types: type) -> list[Entity]:
         with self._lock:
             return [

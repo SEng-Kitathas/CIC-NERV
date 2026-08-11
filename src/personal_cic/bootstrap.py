@@ -74,8 +74,7 @@ def reconcile_topology(context: RuntimeContext) -> None:
 
 
 def _observe(context: RuntimeContext, entity_id: str, component: object) -> str:
-    entity = context.world.entities[entity_id]
-    previous = entity.components.get(type(component).__name__)
+    previous = context.world.get_component(entity_id, type(component))
     significance = telemetry_significance(previous, component, context.thresholds)
     context.world.upsert_component(
         entity_id,
@@ -85,15 +84,16 @@ def _observe(context: RuntimeContext, entity_id: str, component: object) -> str:
     return significance
 
 
-def _ingest_observation_batch(
+def ingest_observation_batch(
     context: RuntimeContext,
     *,
     entity_id: str,
     adapter_id: str,
     observations: tuple[Observation[object], ...],
+    publish_cycle: bool = True,
 ) -> None:
     checked_at = utc_now_iso()
-    previous_state = context.world.entities[entity_id].get(ObservationState)
+    previous_state = context.world.get_component(entity_id, ObservationState)
 
     reasons = tuple(
         f"{observation.source}: {observation.detail}"
@@ -140,23 +140,27 @@ def _ingest_observation_batch(
     )
     _observe(context, entity_id, observation_state)
 
-    context.events.publish(
-        ObservationCycleCompleted(
-            entity_id=entity_id,
-            adapter_id=adapter_id,
-            availability=availability,
+    if publish_cycle:
+        context.events.publish(
+            ObservationCycleCompleted(
+                entity_id=entity_id,
+                adapter_id=adapter_id,
+                availability=availability,
+            )
         )
-    )
 
+
+# Backward-compatible private alias retained for existing regression tests.
+_ingest_observation_batch = ingest_observation_batch
 
 def collect_once(context: RuntimeContext) -> None:
-    _ingest_observation_batch(
+    ingest_observation_batch(
         context,
         entity_id=ENGAGE_ID,
         adapter_id=context.host_adapter.ADAPTER_ID,
         observations=context.host_adapter.collect(),
     )
-    _ingest_observation_batch(
+    ingest_observation_batch(
         context,
         entity_id=TENDA_ID,
         adapter_id=context.tenda_adapter.ADAPTER_ID,

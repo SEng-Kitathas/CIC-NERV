@@ -10,6 +10,7 @@ from personal_cic.core.config import RuntimeConfig
 from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted, RuntimeStopping
 from personal_cic.core.events import utc_now_iso
 from personal_cic.presentation import PresentationServer
+from personal_cic.world_awareness import WorldAwarenessWorker
 
 
 class PersistentRuntime:
@@ -32,12 +33,18 @@ class PersistentRuntime:
         self._last_snapshot_monotonic = 0.0
         self._runtime_started_at: str | None = None
         self.presentation: PresentationServer | None = None
+        self.world_awareness: WorldAwarenessWorker | None = None
         if self.runtime_config.presentation.enabled:
             self.presentation = PresentationServer(
                 world=self.context.world,
                 host=self.runtime_config.presentation.bind_host,
                 port=self.runtime_config.presentation.port,
                 runtime_metadata=self._presentation_metadata,
+            )
+        if self.runtime_config.world_awareness.enabled:
+            self.world_awareness = WorldAwarenessWorker(
+                context=self.context,
+                config=self.runtime_config.world_awareness,
             )
 
     def request_stop(self, reason: str) -> None:
@@ -74,9 +81,16 @@ class PersistentRuntime:
         )
         reconcile_topology(self.context)
 
+        # Re-entry gate: presentation must never expose persisted remote CURRENT
+        # authority before fresh provider observation has been attempted.
+        if self.world_awareness is not None:
+            self.world_awareness.prepare_reentry()
+
         try:
             if self.presentation is not None:
                 self.presentation.start()
+            if self.world_awareness is not None:
+                self.world_awareness.start()
 
             while not self.stop_event.is_set():
                 cycle_started = time.monotonic()
@@ -90,6 +104,8 @@ class PersistentRuntime:
                 )
                 self.stop_event.wait(wait_for)
         finally:
+            if self.world_awareness is not None:
+                self.world_awareness.stop()
             if self.presentation is not None:
                 self.presentation.stop()
             self._snapshot_if_due(force=True)

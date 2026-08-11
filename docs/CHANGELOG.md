@@ -1,5 +1,31 @@
 # Changelog
 
+### 0.3.1 RC3 — verification-gate cleanup
+
+- No runtime semantic changes from RC2.
+- Moves the RC2 re-entry regression functions into their `unittest.TestCase` classes so discovery actually executes them.
+- Removes candidate-wide trailing blank-line/whitespace defects required by the static gate.
+- RC2 is rejected as a verification artifact because its new regressions were present but undiscovered.
+
+### 0.3.1 RC2 — re-entry and provider-attribution hardening
+
+- Withdraws restored remote-provider `CURRENT` authority before presentation starts; fresh Open-Meteo/NWS observation must re-earn current status after every process restart.
+- Preserves last-known remote domain values during that re-entry gate.
+- Ensures NWS alert `authoritative_now` cannot be inherited solely from a persisted snapshot.
+- Adds explicit Open-Meteo / CC BY 4.0 attribution to the World presentation.
+- Adds regression coverage for re-entry ordering and freshness withdrawal.
+- No expansion of 0.3.1 scope.
+
+## 0.3.1 — World Awareness
+
+- Adds typed Open-Meteo current-weather and daily-forecast observations for the configured local area.
+- Adds typed National Weather Service active-alert observations with explicit User-Agent and provider-safe refresh cadence.
+- Runs remote-provider observation on a slow dedicated thread so network latency does not block local 5-second sensing.
+- Preserves last-known remote domain state when a provider becomes unavailable while marking the observation unavailable.
+- Adds `/api/v1/world` and a read-only `/world` page; the browser still owns no provider calls or keys.
+- Adds WorldState synchronized component reads for the newly concurrent remote writer and removes direct entity reads from health/ingest paths.
+- Corrects two 0.3.0 RuntimeConfig tests that were accidentally defined at module scope and therefore not discovered by `unittest`.
+
 ## 0.3.0 — Slice 003 Presentation Surface
 
 - Adds the first read-only browser presentation directly projected from live CIC `WorldState`.

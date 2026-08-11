@@ -83,3 +83,24 @@ This slice does not implement:
 - kiosk boot behavior.
 
 Those remain later slices.
+
+## World-provider re-entry
+
+Persisted remote provider values are last-known history, not inherited current authority.
+
+On process restart:
+
+```text
+hydrate last-known weather/alerts
+    ↓
+mark remote ObservationState UNAVAILABLE
+reason = awaiting fresh provider observation
+    ↓
+start presentation
+    ↓
+fresh provider fetch
+    ↓
+CURRENT is re-earned on success
+```
+
+The World page also carries explicit Open-Meteo / CC BY 4.0 attribution.

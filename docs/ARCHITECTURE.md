@@ -130,3 +130,7 @@ reader now coexist. The semantic home for synchronization is `WorldState`; the
 HTTP layer is not allowed to coordinate domain mutation itself.
 
 Mutation methods are structurally absent from the presentation API.
+
+## 0.3.1 external-awareness boundary
+
+Remote weather and alert providers are observed on a slower dedicated runtime thread. Their typed state is admitted into WorldState using the same Observation Integrity rules as local hardware: request failure changes observation availability but does not fabricate a replacement domain value. Remote provider latency therefore cannot stall the local host/Tenda observation cadence.

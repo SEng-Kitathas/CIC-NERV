@@ -7,5 +7,24 @@
     "enabled": true,
     "bind_host": "127.0.0.1",
     "port": 8765
+  },
+  "world_awareness": {
+    "enabled": true,
+    "location": {
+      "label": "Indian Trail / 28079",
+      "latitude": 35.1115,
+      "longitude": -80.6099
+    },
+    "weather": {
+      "enabled": true,
+      "interval_seconds": 300.0,
+      "timeout_seconds": 8.0
+    },
+    "alerts": {
+      "enabled": true,
+      "interval_seconds": 60.0,
+      "timeout_seconds": 8.0,
+      "user_agent": "Personal-CIC/0.3.1 (local personal system)"
+    }
   }
 }
