@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.2 — Slice 003b WX Fusion Foundation
+
+- Adds NOAA/NWS AviationWeather.gov METAR surface-observation network support for KEQY/KCLT/KJQF.
+- Adds official NWS hourly forecast discovery through `/points` and six-hour forecast projection.
+- Adds a source-aware current-weather estimate that privileges observed surface data and exposes model/forecast disagreement instead of averaging unlike sources.
+- Adds professional surface instrumentation: T/Td/RH, wind/gust, visibility, ceiling, altimeter, flight category, station distance, source age, and station temperature spread.
+- Adds a bounded WX operational feed projected from durable material weather events.
+- Extends remote-provider re-entry withdrawal to METAR, NWS forecast, and current-estimate authority.
+- Keeps radar/MRMS explicitly deferred to the next coherent slice.
+- Rejects METAR rows without a parseable observation timestamp and uses the current `hoursBeforeNow` API window parameter.
+- Treats fused current weather as current-derived state rather than external authority.
+- Renders remote-provider strings with DOM `textContent` rather than `innerHTML`.
+
 ### 0.3.1 RC3 — verification-gate cleanup
 
 - No runtime semantic changes from RC2.

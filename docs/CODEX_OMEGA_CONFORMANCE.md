@@ -43,3 +43,10 @@ A residual becomes P0 only when it creates a demonstrated correctness, authority
 - **Semantic home:** remote polling lives in typed adapters/runtime, never in browser code.
 - **Timescale integrity:** slow remote I/O is isolated from the local 5-second observation loop.
 - **Negative evidence:** a successful NWS response containing zero active alerts is legitimate current negative evidence; an unavailable NWS request is not.
+## 0.3.2 conformance
+
+- **Semantic homes:** surface observation, model current, official forecast, official alerts, derived estimate, and event-feed projection remain distinct.
+- **Evidence honesty:** unlike weather sources are compared by role, not blindly averaged.
+- **Re-entry:** restored remote freshness is withdrawn for every new provider/derived estimate before presentation.
+- **Materiality:** provider polling does not itself create feed/history; the WX feed reads material journal facts.
+- **Native substrate:** AviationWeather and NWS linked-data endpoints are consumed through narrow typed adapters.

@@ -139,3 +139,14 @@ GET http://127.0.0.1:8765/api/v1/systems
 ## 0.3.1 — World Awareness
 
 The World page is available at `http://127.0.0.1:8765/world`. Remote weather/alert providers are observed by CIC adapters and projected from WorldState; the browser never calls them directly.
+## 0.3.2 — WX Fusion Foundation
+
+The World surface now distinguishes observed surface weather (AviationWeather METAR), model-derived
+Open-Meteo context, official NWS hourly forecasts, and NWS alerts. It derives a source-aware current
+estimate and exposes source disagreement rather than hiding it.
+
+The World API remains read-only:
+
+```text
+GET http://127.0.0.1:8765/api/v1/world
+```

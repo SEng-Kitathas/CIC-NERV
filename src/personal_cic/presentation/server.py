@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 import json
 from threading import Thread
 from typing import Callable
@@ -6,6 +7,7 @@ from typing import Callable
 from personal_cic.core.world import WorldState
 from .pages import SYSTEMS_HTML, WORLD_HTML
 from .projection import build_systems_projection, build_world_projection
+from .weather_feed import build_weather_feed
 
 
 class _CICHTTPServer(ThreadingHTTPServer):
@@ -13,7 +15,7 @@ class _CICHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
 
-def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict]):
+def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict], event_journal_path: Path | None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "PersonalCIC/0.3"
 
@@ -61,7 +63,7 @@ def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict]):
                 )
                 return
             if self.path == "/api/v1/world":
-                self._send_json(build_world_projection(world))
+                self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
                 return
             if self.path == "/favicon.ico":
                 self._headers(204, "image/x-icon")
@@ -100,13 +102,14 @@ def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict]):
 class PresentationServer:
     """Loopback-only, read-only projection server for CIC WorldState."""
 
-    def __init__(self, *, world: WorldState, host: str, port: int, runtime_metadata: Callable[[], dict]) -> None:
+    def __init__(self, *, world: WorldState, host: str, port: int, runtime_metadata: Callable[[], dict], event_journal_path: Path | None = None) -> None:
         if host != "127.0.0.1":
             raise ValueError("Presentation is intentionally loopback-only")
         self.world = world
         self.host = host
         self.port = port
         self.runtime_metadata = runtime_metadata
+        self.event_journal_path = event_journal_path
         self._httpd: _CICHTTPServer | None = None
         self._thread: Thread | None = None
 
@@ -117,7 +120,7 @@ class PresentationServer:
     def start(self) -> None:
         if self._httpd is not None:
             return
-        self._httpd = _CICHTTPServer((self.host, self.port), _handler_factory(self.world, self.runtime_metadata))
+        self._httpd = _CICHTTPServer((self.host, self.port), _handler_factory(self.world, self.runtime_metadata, self.event_journal_path))
         self._thread = Thread(target=self._httpd.serve_forever, name="personal-cic-presentation", daemon=True)
         self._thread.start()
 

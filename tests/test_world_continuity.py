@@ -98,6 +98,67 @@ class WorldContinuityTests(unittest.TestCase):
             self.assertIsInstance(state.alerts[0], WeatherAlertSummary)
             self.assertEqual(state.alerts[0].alert_id, "a1")
 
+    def test_surface_and_nws_forecast_nested_components_round_trip(self):
+        from personal_cic.core.world.components import NWSForecastHour, NWSHourlyForecastState, SurfaceObservationNetworkState, SurfaceStationObservation
+        station=SurfaceStationObservation("KEQY","Monroe","t",35.0,-80.6,8.0,75.0,70.0,80.0,260.0,10.0,15.0,10.0,29.8,1010.0,3000,"VFR",None,"raw")
+        surface=SurfaceObservationNetworkState("Test","AWC","t","KEQY",1,75.0,70.0,80.0,0.0,(station,))
+        hour=NWSForecastHour("h",76.0,70.0,80.0,50.0,5.0,10.0,"SW","Showers")
+        forecast=NWSHourlyForecastState("Test","NWS","GSP",1,2,"g","u",(hour,))
+        world=WorldState(EventBus())
+        world.ensure_entity("surface","Surface"); world.upsert_component("surface",surface); world.upsert_component("surface",forecast)
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"world.json"; world.write_json(path)
+            restored=WorldState(EventBus()); restored.hydrate_json(path)
+        self.assertEqual(restored.get_component("surface", SurfaceObservationNetworkState),surface)
+        self.assertEqual(restored.get_component("surface", NWSHourlyForecastState),forecast)
+
+    def test_rc1_estimate_snapshot_field_names_migrate_on_hydration(self):
+        from personal_cic.core.world.components import CurrentWeatherEstimateState
+        payload = {
+            "schema_version": 2,
+            "entities": {
+                "local-weather-estimate": {
+                    "label": "Current Weather Estimate",
+                    "components": {
+                        "CurrentWeatherEstimateState": {
+                            "location_label": "Test",
+                            "derived_at": "2026-08-12T00:34:02+00:00",
+                            "method": "surface_median + nearest_station_context",
+                            "primary_source": "NOAA/NWS AviationWeather.gov METAR",
+                            "surface_station_count": 3,
+                            "temperature_f": 73.0,
+                            "dewpoint_f": 71.0,
+                            "relative_humidity_percent": 94.0,
+                            "wind_direction_deg": 0.0,
+                            "wind_speed_mph": 0.0,
+                            "wind_gust_mph": None,
+                            "visibility_sm": 6.0,
+                            "altimeter_inhg": 30.01,
+                            "ceiling_ft_agl": 12000,
+                            "flight_category": "VFR",
+                            "surface_temperature_spread_f": 1.4,
+                            "open_meteo_temperature_f": 75.5,
+                            "open_meteo_delta_f": 2.5,
+                            "nws_next_hour_temperature_f": 88.0,
+                            "nws_next_hour_delta_f": 15.0,
+                            "nws_next_hour_start": "2026-08-11T20:00:00-04:00"
+                        }
+                    }
+                }
+            }
+        }
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"world.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            world=WorldState(EventBus())
+            restored=world.hydrate_json(path)
+        self.assertEqual(restored,1)
+        state=world.get_component("local-weather-estimate",CurrentWeatherEstimateState)
+        self.assertEqual(state.nws_reference_temperature_f,88.0)
+        self.assertEqual(state.nws_reference_delta_f,15.0)
+        self.assertEqual(state.nws_reference_start,"2026-08-11T20:00:00-04:00")
+
 
 if __name__ == "__main__":
     unittest.main()

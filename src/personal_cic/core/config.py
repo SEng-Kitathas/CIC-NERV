@@ -88,7 +88,7 @@ class NWSAlertsConfig:
     enabled: bool = True
     interval_seconds: float = 60.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.1 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "NWSAlertsConfig":
@@ -115,6 +115,65 @@ class NWSAlertsConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class AviationSurfaceConfig:
+    enabled: bool = True
+    interval_seconds: float = 60.0
+    timeout_seconds: float = 8.0
+    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
+    station_ids: tuple[str, ...] = ("KEQY", "KCLT", "KJQF")
+    max_age_minutes: float = 90.0
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "AviationSurfaceConfig":
+        if not data:
+            return cls()
+        interval = float(data.get("interval_seconds", 60.0))
+        timeout = float(data.get("timeout_seconds", 8.0))
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.2 (local personal system)")).strip()
+        raw_ids = data.get("station_ids", ["KEQY", "KCLT", "KJQF"])
+        station_ids = tuple(str(item).strip().upper() for item in raw_ids if str(item).strip())
+        max_age = float(data.get("max_age_minutes", 90.0))
+        if interval < 60.0:
+            raise ValueError("AviationWeather interval_seconds must be >= 60 seconds")
+        if timeout <= 0:
+            raise ValueError("AviationWeather timeout_seconds must be > 0")
+        if not user_agent:
+            raise ValueError("AviationWeather requires a non-empty User-Agent")
+        if not station_ids:
+            raise ValueError("AviationWeather requires at least one station ID")
+        if max_age <= 0:
+            raise ValueError("AviationWeather max_age_minutes must be > 0")
+        return cls(bool(data.get("enabled", True)), interval, timeout, user_agent, station_ids, max_age)
+
+
+@dataclass(frozen=True, slots=True)
+class NWSForecastConfig:
+    enabled: bool = True
+    interval_seconds: float = 300.0
+    timeout_seconds: float = 8.0
+    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
+    points_refresh_seconds: float = 21600.0
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "NWSForecastConfig":
+        if not data:
+            return cls()
+        interval = float(data.get("interval_seconds", 300.0))
+        timeout = float(data.get("timeout_seconds", 8.0))
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.2 (local personal system)")).strip()
+        refresh = float(data.get("points_refresh_seconds", 21600.0))
+        if interval < 60.0:
+            raise ValueError("NWS forecast interval_seconds must be >= 60 seconds")
+        if timeout <= 0:
+            raise ValueError("NWS forecast timeout_seconds must be > 0")
+        if refresh < interval:
+            raise ValueError("NWS points_refresh_seconds must be >= forecast interval")
+        if not user_agent:
+            raise ValueError("NWS forecast requires a non-empty User-Agent")
+        return cls(bool(data.get("enabled", True)), interval, timeout, user_agent, refresh)
+
+
+@dataclass(frozen=True, slots=True)
 class WorldAwarenessConfig:
     enabled: bool = False
     location: AwarenessLocationConfig = field(default_factory=AwarenessLocationConfig)
@@ -122,6 +181,8 @@ class WorldAwarenessConfig:
         default_factory=lambda: RemoteProviderConfig(interval_seconds=300.0)
     )
     alerts: NWSAlertsConfig = field(default_factory=NWSAlertsConfig)
+    surface: AviationSurfaceConfig = field(default_factory=AviationSurfaceConfig)
+    forecast: NWSForecastConfig = field(default_factory=NWSForecastConfig)
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "WorldAwarenessConfig":
@@ -135,6 +196,8 @@ class WorldAwarenessConfig:
                 default_interval_seconds=300.0,
             ),
             alerts=NWSAlertsConfig.from_mapping(data.get("alerts")),
+            surface=AviationSurfaceConfig.from_mapping(data.get("surface")),
+            forecast=NWSForecastConfig.from_mapping(data.get("forecast")),
         )
 
 

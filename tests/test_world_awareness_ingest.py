@@ -73,3 +73,8 @@ class WorldAwarenessIngestTests(unittest.TestCase):
             ObservationAvailability.UNAVAILABLE,
         )
         self.assertIn("awaiting fresh NWS alert observation", alerts_obs.reasons[0])
+
+        for entity_id, reason in (("local-weather-surface", "awaiting fresh AviationWeather METAR observation"), ("local-weather-nws-forecast", "awaiting fresh NWS hourly forecast"), ("local-weather-estimate", "awaiting fresh current-weather source")):
+            state = context.world.get_component(entity_id, ObservationState)
+            self.assertEqual(state.availability, ObservationAvailability.UNAVAILABLE)
+            self.assertIn(reason, state.reasons[0])

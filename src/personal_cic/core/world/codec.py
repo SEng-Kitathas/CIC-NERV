@@ -23,6 +23,11 @@ from .components import (
     WeatherAlertSummary,
     WeatherForecastState,
     WeatherState,
+    SurfaceStationObservation,
+    SurfaceObservationNetworkState,
+    NWSForecastHour,
+    NWSHourlyForecastState,
+    CurrentWeatherEstimateState,
 )
 
 
@@ -46,6 +51,9 @@ COMPONENT_TYPES = {
         WeatherState,
         WeatherForecastState,
         WeatherAlertState,
+        SurfaceObservationNetworkState,
+        NWSHourlyForecastState,
+        CurrentWeatherEstimateState,
     )
 }
 
@@ -78,6 +86,27 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
             for item in values.get("alerts", [])
             if isinstance(item, dict)
         )
+    elif component_type is SurfaceObservationNetworkState:
+        values["stations"] = tuple(
+            SurfaceStationObservation(**item)
+            for item in values.get("stations", [])
+            if isinstance(item, dict)
+        )
+    elif component_type is NWSHourlyForecastState:
+        values["hours"] = tuple(
+            NWSForecastHour(**item)
+            for item in values.get("hours", [])
+            if isinstance(item, dict)
+        )
+    elif component_type is CurrentWeatherEstimateState:
+        legacy = (
+            ("nws_next_hour_temperature_f", "nws_reference_temperature_f"),
+            ("nws_next_hour_delta_f", "nws_reference_delta_f"),
+            ("nws_next_hour_start", "nws_reference_start"),
+        )
+        for old_name, new_name in legacy:
+            if new_name not in values and old_name in values:
+                values[new_name] = values.pop(old_name)
     elif component_type is ObservationState:
         values["availability"] = ObservationAvailability(values["availability"])
         if isinstance(values.get("reasons"), list):

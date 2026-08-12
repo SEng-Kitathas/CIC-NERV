@@ -156,3 +156,89 @@ class WeatherAlertState:
     highest_severity: str | None
     provider_updated_at: str | None
     alerts: tuple[WeatherAlertSummary, ...] = ()
+
+@dataclass(frozen=True, slots=True)
+class SurfaceStationObservation:
+    station_id: str
+    station_name: str | None
+    observed_at: str | None
+    latitude: float | None
+    longitude: float | None
+    distance_mi: float | None
+    temperature_f: float | None
+    dewpoint_f: float | None
+    relative_humidity_percent: float | None
+    wind_direction_deg: float | None
+    wind_speed_mph: float | None
+    wind_gust_mph: float | None
+    visibility_sm: float | None
+    altimeter_inhg: float | None
+    sea_level_pressure_hpa: float | None
+    ceiling_ft_agl: int | None
+    flight_category: str | None
+    present_weather: str | None
+    raw_metar: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SurfaceObservationNetworkState:
+    location_label: str
+    provider: str
+    freshest_observed_at: str | None
+    selected_station_id: str | None
+    station_count: int
+    temperature_median_f: float | None
+    dewpoint_median_f: float | None
+    relative_humidity_percent: float | None
+    temperature_spread_f: float | None
+    stations: tuple[SurfaceStationObservation, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class NWSForecastHour:
+    start_time: str
+    temperature_f: float | None
+    dewpoint_f: float | None
+    relative_humidity_percent: float | None
+    precipitation_probability_percent: float | None
+    wind_speed_min_mph: float | None
+    wind_speed_max_mph: float | None
+    wind_direction: str | None
+    short_forecast: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class NWSHourlyForecastState:
+    location_label: str
+    provider: str
+    office: str | None
+    grid_x: int | None
+    grid_y: int | None
+    generated_at: str | None
+    updated_at: str | None
+    hours: tuple[NWSForecastHour, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentWeatherEstimateState:
+    location_label: str
+    derived_at: str
+    method: str
+    primary_source: str
+    surface_station_count: int
+    temperature_f: float | None
+    dewpoint_f: float | None
+    relative_humidity_percent: float | None
+    wind_direction_deg: float | None
+    wind_speed_mph: float | None
+    wind_gust_mph: float | None
+    visibility_sm: float | None
+    altimeter_inhg: float | None
+    ceiling_ft_agl: int | None
+    flight_category: str | None
+    surface_temperature_spread_f: float | None
+    open_meteo_temperature_f: float | None
+    open_meteo_delta_f: float | None
+    nws_reference_temperature_f: float | None
+    nws_reference_delta_f: float | None
+    nws_reference_start: str | None

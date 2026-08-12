@@ -134,3 +134,6 @@ Mutation methods are structurally absent from the presentation API.
 ## 0.3.1 external-awareness boundary
 
 Remote weather and alert providers are observed on a slower dedicated runtime thread. Their typed state is admitted into WorldState using the same Observation Integrity rules as local hardware: request failure changes observation availability but does not fabricate a replacement domain value. Remote provider latency therefore cannot stall the local host/Tenda observation cadence.
+## 0.3.2 source-role weather architecture
+
+Weather sources are not interchangeable votes. METAR owns observed surface reports, NWS owns official forecast/alerts, and Open-Meteo remains model-derived context/fallback. Current-weather fusion preserves those roles and exposes disagreement. The WX feed is a read-only projection of material durable events, not a competing history store.

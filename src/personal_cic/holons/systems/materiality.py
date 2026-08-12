@@ -14,6 +14,9 @@ from personal_cic.core.world.components import (
     WeatherAlertState,
     WeatherForecastState,
     WeatherState,
+    SurfaceObservationNetworkState,
+    NWSHourlyForecastState,
+    CurrentWeatherEstimateState,
 )
 
 
@@ -163,6 +166,45 @@ def telemetry_significance(
             current.alerts,
         )
         return "material" if semantic_old != semantic_new else "sample"
+
+
+    if isinstance(current, SurfaceObservationNetworkState) and isinstance(previous, SurfaceObservationNetworkState):
+        old_ids = tuple(station.station_id for station in previous.stations)
+        new_ids = tuple(station.station_id for station in current.stations)
+        def selected(state):
+            return next((station for station in state.stations if station.station_id == state.selected_station_id), None)
+        old_station = selected(previous)
+        new_station = selected(current)
+        old_semantic = (
+            previous.selected_station_id,
+            old_ids,
+            None if old_station is None else old_station.flight_category,
+            None if old_station is None else old_station.present_weather,
+        )
+        new_semantic = (
+            current.selected_station_id,
+            new_ids,
+            None if new_station is None else new_station.flight_category,
+            None if new_station is None else new_station.present_weather,
+        )
+        return "material" if old_semantic != new_semantic else "sample"
+
+    if isinstance(current, NWSHourlyForecastState) and isinstance(previous, NWSHourlyForecastState):
+        old = previous.hours[0] if previous.hours else None
+        new = current.hours[0] if current.hours else None
+        def pop_band(hour):
+            if hour is None or hour.precipitation_probability_percent is None:
+                return None
+            value = hour.precipitation_probability_percent
+            return 0 if value < 20 else 1 if value < 50 else 2 if value < 80 else 3
+        old_semantic = (None if old is None else old.short_forecast, pop_band(old))
+        new_semantic = (None if new is None else new.short_forecast, pop_band(new))
+        return "material" if old_semantic != new_semantic else "sample"
+
+    if isinstance(current, CurrentWeatherEstimateState) and isinstance(previous, CurrentWeatherEstimateState):
+        old_semantic = (previous.method, previous.primary_source, previous.surface_station_count, previous.flight_category)
+        new_semantic = (current.method, current.primary_source, current.surface_station_count, current.flight_category)
+        return "material" if old_semantic != new_semantic else "sample"
 
     if isinstance(current, WifiLinkState) and isinstance(previous, WifiLinkState):
         structural_old = (

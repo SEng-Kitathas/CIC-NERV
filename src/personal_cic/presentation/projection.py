@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import statistics
 from typing import Any
 
 from personal_cic.core.world import WorldState
@@ -206,59 +207,88 @@ _WEATHER_CODES = {
 }
 
 
-def build_world_projection(world: WorldState) -> dict[str, Any]:
-    """Project remote-provider observations without promoting them beyond their scope."""
+def build_world_projection(world: WorldState, *, feed: list[dict] | None = None) -> dict[str, Any]:
+    """Project source-aware world observations without promoting them beyond scope."""
 
     snapshot = world.snapshot()
     entities = snapshot.get("entities", {})
     weather_entity = entities.get("local-weather", {})
     alerts_entity = entities.get("local-weather-alerts", {})
+    surface_entity = entities.get("local-weather-surface", {})
+    forecast_entity = entities.get("local-weather-nws-forecast", {})
+    estimate_entity = entities.get("local-weather-estimate", {})
 
     weather = _component(weather_entity, "WeatherState") or {}
-    forecast = _component(weather_entity, "WeatherForecastState") or {}
+    forecast_daily = _component(weather_entity, "WeatherForecastState") or {}
     weather_obs = _component(weather_entity, "ObservationState") or {}
-
     alerts = _component(alerts_entity, "WeatherAlertState") or {}
     alerts_obs = _component(alerts_entity, "ObservationState") or {}
+    surface = _component(surface_entity, "SurfaceObservationNetworkState") or {}
+    surface_obs = _component(surface_entity, "ObservationState") or {}
+    nws_forecast = _component(forecast_entity, "NWSHourlyForecastState") or {}
+    forecast_obs = _component(forecast_entity, "ObservationState") or {}
+    estimate = _component(estimate_entity, "CurrentWeatherEstimateState") or {}
+    estimate_obs = _component(estimate_entity, "ObservationState") or {}
 
     weather_code = weather.get("weather_code")
+    location = (
+        estimate.get("location_label") or surface.get("location_label") or weather.get("location_label")
+        or alerts.get("location_label") or "configured local area"
+    )
+
+    def obs(value):
+        return {
+            "availability": value.get("availability", "unavailable"),
+            "adapter_id": value.get("adapter_id"),
+            "checked_at": value.get("checked_at"),
+            "last_success_at": value.get("last_success_at"),
+            "freshness_seconds": _freshness_seconds(value.get("checked_at")),
+            "reasons": value.get("reasons", []),
+        }
+
+    stations = surface.get("stations") or []
+
+    def station_values(key):
+        return [float(station[key]) for station in stations if isinstance(station, dict) and isinstance(station.get(key), (int, float))]
+
+    wind_speeds = station_values("wind_speed_mph")
+    gusts = station_values("wind_gust_mph")
+    visibilities = station_values("visibility_sm")
+    ceilings = station_values("ceiling_ft_agl")
+    surface_projection = {
+        **surface,
+        "wind_speed_median_mph": None if not wind_speeds else statistics.median(wind_speeds),
+        "wind_gust_max_mph": None if not gusts else max(gusts),
+        "visibility_min_sm": None if not visibilities else min(visibilities),
+        "ceiling_min_ft_agl": None if not ceilings else int(min(ceilings)),
+        "observation": obs(surface_obs),
+    }
+
     return {
-        "api_version": 1,
+        "api_version": 2,
         "presentation": {
             "mode": "read-only",
             "generated_at": _now_iso(),
             "world_schema_version": snapshot.get("schema_version"),
         },
-        "location": {
-            "label": weather.get("location_label")
-            or alerts.get("location_label")
-            or "configured local area",
+        "location": {"label": location},
+        "estimate": {
+            **estimate,
+            "current_now": estimate_obs.get("availability") == "current",
+            "observation": obs(estimate_obs),
         },
+        "surface": surface_projection,
         "weather": {
             **weather,
-            "condition": _WEATHER_CODES.get(weather_code, "Unknown")
-            if weather_code is not None
-            else None,
-            "observation": {
-                "availability": weather_obs.get("availability", "unavailable"),
-                "adapter_id": weather_obs.get("adapter_id"),
-                "checked_at": weather_obs.get("checked_at"),
-                "last_success_at": weather_obs.get("last_success_at"),
-                "freshness_seconds": _freshness_seconds(weather_obs.get("checked_at")),
-                "reasons": weather_obs.get("reasons", []),
-            },
-            "forecast": forecast,
+            "condition": _WEATHER_CODES.get(weather_code, "Unknown") if weather_code is not None else None,
+            "observation": obs(weather_obs),
+            "forecast": forecast_daily,
         },
+        "nws_forecast": {**nws_forecast, "observation": obs(forecast_obs)},
         "alerts": {
             **alerts,
             "authoritative_now": alerts_obs.get("availability") == "current",
-            "observation": {
-                "availability": alerts_obs.get("availability", "unavailable"),
-                "adapter_id": alerts_obs.get("adapter_id"),
-                "checked_at": alerts_obs.get("checked_at"),
-                "last_success_at": alerts_obs.get("last_success_at"),
-                "freshness_seconds": _freshness_seconds(alerts_obs.get("checked_at")),
-                "reasons": alerts_obs.get("reasons", []),
-            },
+            "observation": obs(alerts_obs),
         },
+        "feed": list(feed or []),
     }

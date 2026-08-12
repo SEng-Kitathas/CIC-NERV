@@ -20,6 +20,11 @@ from personal_cic.core.world.components import (
     WeatherAlertState,
     WeatherForecastState,
     WeatherState,
+    CurrentWeatherEstimateState,
+    NWSForecastHour,
+    NWSHourlyForecastState,
+    SurfaceObservationNetworkState,
+    SurfaceStationObservation,
 )
 from personal_cic.presentation import (
     PresentationServer,
@@ -215,6 +220,52 @@ class PresentationTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as captured:
             urlopen(request, timeout=2)
         self.assertEqual(captured.exception.code, 405)
+
+    def test_world_projection_exposes_surface_forecast_estimate_and_feed(self):
+        self.world.ensure_entity("local-weather-surface","Surface")
+        self.world.ensure_entity("local-weather-nws-forecast","Forecast")
+        self.world.ensure_entity("local-weather-estimate","Estimate")
+        station=SurfaceStationObservation("KEQY","Monroe","t",35.0,-80.6,8.0,75.0,70.0,80.0,260.0,10.0,15.0,10.0,29.8,1010.0,3000,"VFR",None,"raw")
+        self.world.upsert_component("local-weather-surface",SurfaceObservationNetworkState("Test","AWC","t","KEQY",1,75.0,70.0,80.0,0.0,(station,)))
+        self.world.upsert_component("local-weather-surface",ObservationState("aviationweather.metar",ObservationAvailability.CURRENT,"2026-08-11T20:00:00+00:00","2026-08-11T20:00:00+00:00",()))
+        hour=NWSForecastHour("h",76.0,70.0,80.0,50.0,5.0,10.0,"SW","Showers")
+        self.world.upsert_component("local-weather-nws-forecast",NWSHourlyForecastState("Test","NWS","GSP",1,2,"g","u",(hour,)))
+        self.world.upsert_component("local-weather-nws-forecast",ObservationState("nws.forecast.hourly",ObservationAvailability.CURRENT,"2026-08-11T20:00:00+00:00","2026-08-11T20:00:00+00:00",()))
+        estimate=CurrentWeatherEstimateState("Test","d","surface_median + nearest_station_context","NOAA/NWS AviationWeather.gov METAR",1,75.0,70.0,80.0,260.0,10.0,15.0,10.0,29.8,3000,"VFR",0.0,77.0,2.0,76.0,1.0,"h")
+        self.world.upsert_component("local-weather-estimate",estimate)
+        self.world.upsert_component("local-weather-estimate",ObservationState("weather.fusion",ObservationAvailability.CURRENT,"2026-08-11T20:00:00+00:00","2026-08-11T20:00:00+00:00",()))
+        projection=build_world_projection(self.world,feed=[{"category":"ALERT","title":"Test","detail":"x"}])
+        self.assertEqual(projection["api_version"],2)
+        self.assertEqual(projection["surface"]["selected_station_id"],"KEQY")
+        self.assertEqual(projection["surface"]["wind_speed_median_mph"],10.0)
+        self.assertEqual(projection["surface"]["wind_gust_max_mph"],15.0)
+        self.assertEqual(projection["surface"]["visibility_min_sm"],10.0)
+        self.assertEqual(projection["surface"]["ceiling_min_ft_agl"],3000)
+        self.assertEqual(projection["nws_forecast"]["hours"][0]["short_forecast"],"Showers")
+        self.assertTrue(projection["estimate"]["current_now"])
+        self.assertNotIn("authoritative_now", projection["estimate"])
+        self.assertEqual(projection["feed"][0]["category"],"ALERT")
+
+    def test_world_page_does_not_interpolate_provider_strings_through_inner_html(self):
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {},
+        )
+        server.start()
+        self.addCleanup(server.stop)
+
+        with urlopen(
+            f"http://127.0.0.1:{server.bound_port}/world",
+            timeout=2,
+        ) as response:
+            body = response.read().decode("utf-8")
+
+        self.assertIn("const cell=", body)
+        self.assertIn("replaceChildren()", body)
+        self.assertNotIn("tr.innerHTML=", body)
+        self.assertNotIn("div.innerHTML=", body)
 
 if __name__ == "__main__":
     unittest.main()

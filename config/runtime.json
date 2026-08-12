@@ -24,7 +24,26 @@
       "enabled": true,
       "interval_seconds": 60.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.1 (local personal system)"
+      "user_agent": "Personal-CIC/0.3.2 (local personal system)"
+    },
+    "surface": {
+      "enabled": true,
+      "interval_seconds": 60.0,
+      "timeout_seconds": 8.0,
+      "user_agent": "Personal-CIC/0.3.2 (local personal system)",
+      "station_ids": [
+        "KEQY",
+        "KCLT",
+        "KJQF"
+      ],
+      "max_age_minutes": 90.0
+    },
+    "forecast": {
+      "enabled": true,
+      "interval_seconds": 300.0,
+      "timeout_seconds": 8.0,
+      "user_agent": "Personal-CIC/0.3.2 (local personal system)",
+      "points_refresh_seconds": 21600.0
     }
   }
 }

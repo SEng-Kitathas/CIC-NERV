@@ -40,6 +40,7 @@ class PersistentRuntime:
                 host=self.runtime_config.presentation.bind_host,
                 port=self.runtime_config.presentation.port,
                 runtime_metadata=self._presentation_metadata,
+                event_journal_path=self.runtime_config.event_journal_path,
             )
         if self.runtime_config.world_awareness.enabled:
             self.world_awareness = WorldAwarenessWorker(

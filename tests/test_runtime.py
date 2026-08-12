@@ -66,6 +66,35 @@ class RuntimeConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._load(data)
 
+    def test_world_awareness_surface_and_forecast_config(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+        config=WorldAwarenessConfig.from_mapping({"enabled":True,"surface":{"station_ids":["keqy","kclt"],"interval_seconds":60},"forecast":{"interval_seconds":300,"points_refresh_seconds":21600}})
+        self.assertEqual(config.surface.station_ids,("KEQY","KCLT"))
+        self.assertEqual(config.surface.interval_seconds,60.0)
+        self.assertEqual(config.forecast.interval_seconds,300.0)
+
+    def test_aviationweather_interval_below_one_minute_is_rejected(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+        with self.assertRaises(ValueError):
+            WorldAwarenessConfig.from_mapping({"enabled":True,"surface":{"interval_seconds":30}})
+
+    def test_world_awareness_provider_default_user_agents_are_real_strings(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        config = WorldAwarenessConfig.from_mapping({"enabled": True})
+
+        self.assertEqual(
+            config.surface.user_agent,
+            "Personal-CIC/0.3.2 (local personal system)",
+        )
+        self.assertEqual(
+            config.forecast.user_agent,
+            "Personal-CIC/0.3.2 (local personal system)",
+        )
+        self.assertEqual(
+            config.alerts.user_agent,
+            "Personal-CIC/0.3.2 (local personal system)",
+        )
 
 if __name__ == "__main__":
     unittest.main()

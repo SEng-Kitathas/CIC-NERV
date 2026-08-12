@@ -3,14 +3,29 @@ from __future__ import annotations
 import threading
 import time
 
-from personal_cic.adapters.world import NWSAlertsAdapter, OpenMeteoWeatherAdapter
+from personal_cic.adapters.world import (
+    AviationSurfaceAdapter,
+    NWSAlertsAdapter,
+    NWSHourlyForecastAdapter,
+    OpenMeteoWeatherAdapter,
+)
 from personal_cic.bootstrap import RuntimeContext, ingest_observation_batch
 from personal_cic.core.config import WorldAwarenessConfig
-from personal_cic.core.observations import Observation
+from personal_cic.core.observations import Observation, ObservationAvailability
+from personal_cic.core.world.components import (
+    NWSHourlyForecastState,
+    ObservationState,
+    SurfaceObservationNetworkState,
+    WeatherState,
+)
+from personal_cic.weather_fusion import derive_current_weather_estimate
 
 
 WEATHER_ENTITY_ID = "local-weather"
 ALERTS_ENTITY_ID = "local-weather-alerts"
+SURFACE_ENTITY_ID = "local-weather-surface"
+FORECAST_ENTITY_ID = "local-weather-nws-forecast"
+ESTIMATE_ENTITY_ID = "local-weather-estimate"
 
 
 class WorldAwarenessWorker:
@@ -33,63 +48,61 @@ class WorldAwarenessWorker:
             user_agent=config.alerts.user_agent,
             timeout_seconds=config.alerts.timeout_seconds,
         )
+        self.surface_adapter = AviationSurfaceAdapter(
+            location_label=loc.label,
+            latitude=loc.latitude,
+            longitude=loc.longitude,
+            station_ids=config.surface.station_ids,
+            user_agent=config.surface.user_agent,
+            max_age_minutes=config.surface.max_age_minutes,
+            timeout_seconds=config.surface.timeout_seconds,
+        )
+        self.forecast_adapter = NWSHourlyForecastAdapter(
+            location_label=loc.label,
+            latitude=loc.latitude,
+            longitude=loc.longitude,
+            user_agent=config.forecast.user_agent,
+            points_refresh_seconds=config.forecast.points_refresh_seconds,
+            timeout_seconds=config.forecast.timeout_seconds,
+        )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
     def _ensure_entities(self) -> None:
         self.context.world.ensure_entity(WEATHER_ENTITY_ID, "Local Weather")
         self.context.world.ensure_entity(ALERTS_ENTITY_ID, "Local Weather Alerts")
+        self.context.world.ensure_entity(SURFACE_ENTITY_ID, "Local Surface Observations")
+        self.context.world.ensure_entity(FORECAST_ENTITY_ID, "NWS Hourly Forecast")
+        self.context.world.ensure_entity(ESTIMATE_ENTITY_ID, "Current Weather Estimate")
+
+    def _withdraw(self, entity_id: str, adapter_id: str, reason: str) -> None:
+        ingest_observation_batch(
+            self.context,
+            entity_id=entity_id,
+            adapter_id=adapter_id,
+            observations=(Observation.unavailable("reentry", reason),),
+            publish_cycle=False,
+        )
 
     def prepare_reentry(self) -> None:
-        """Withdraw restored remote freshness before presentation becomes visible.
-
-        Persisted domain values remain available as last-known state, but a process
-        restart must not inherit CURRENT authority for remote provider observations.
-        Fresh provider requests must re-earn that state.
-        """
-
         if not self.config.enabled:
             return
-
         self._ensure_entities()
-
         if self.config.weather.enabled:
-            ingest_observation_batch(
-                self.context,
-                entity_id=WEATHER_ENTITY_ID,
-                adapter_id=self.weather_adapter.ADAPTER_ID,
-                observations=(
-                    Observation.unavailable(
-                        "reentry",
-                        "awaiting fresh Open-Meteo observation",
-                    ),
-                ),
-                publish_cycle=False,
-            )
-
+            self._withdraw(WEATHER_ENTITY_ID, self.weather_adapter.ADAPTER_ID, "awaiting fresh Open-Meteo observation")
         if self.config.alerts.enabled:
-            ingest_observation_batch(
-                self.context,
-                entity_id=ALERTS_ENTITY_ID,
-                adapter_id=self.alerts_adapter.ADAPTER_ID,
-                observations=(
-                    Observation.unavailable(
-                        "reentry",
-                        "awaiting fresh NWS alert observation",
-                    ),
-                ),
-                publish_cycle=False,
-            )
+            self._withdraw(ALERTS_ENTITY_ID, self.alerts_adapter.ADAPTER_ID, "awaiting fresh NWS alert observation")
+        if self.config.surface.enabled:
+            self._withdraw(SURFACE_ENTITY_ID, self.surface_adapter.ADAPTER_ID, "awaiting fresh AviationWeather METAR observation")
+        if self.config.forecast.enabled:
+            self._withdraw(FORECAST_ENTITY_ID, self.forecast_adapter.ADAPTER_ID, "awaiting fresh NWS hourly forecast")
+        self._withdraw(ESTIMATE_ENTITY_ID, "weather.fusion", "awaiting fresh current-weather source")
 
     def start(self) -> None:
         if not self.config.enabled or self._thread is not None:
             return
         self._ensure_entities()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="personal-cic-world-awareness",
-            daemon=True,
-        )
+        self._thread = threading.Thread(target=self._run, name="personal-cic-world-awareness", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -98,53 +111,87 @@ class WorldAwarenessWorker:
             timeout = max(
                 self.config.weather.timeout_seconds,
                 self.config.alerts.timeout_seconds,
+                self.config.surface.timeout_seconds,
+                self.config.forecast.timeout_seconds * 2,
             ) + 2.0
             self._thread.join(timeout=timeout)
         self._thread = None
 
-    def _collect_weather(self) -> None:
+    def _recompute_estimate(self) -> None:
+        surface = self.context.world.get_component(SURFACE_ENTITY_ID, SurfaceObservationNetworkState)
+        surface_obs = self.context.world.get_component(SURFACE_ENTITY_ID, ObservationState)
+        weather = self.context.world.get_component(WEATHER_ENTITY_ID, WeatherState)
+        weather_obs = self.context.world.get_component(WEATHER_ENTITY_ID, ObservationState)
+        forecast = self.context.world.get_component(FORECAST_ENTITY_ID, NWSHourlyForecastState)
+        forecast_obs = self.context.world.get_component(FORECAST_ENTITY_ID, ObservationState)
+        state = derive_current_weather_estimate(
+            location_label=self.config.location.label,
+            surface=surface,
+            surface_current=bool(surface_obs and surface_obs.availability is ObservationAvailability.CURRENT),
+            open_meteo=weather,
+            open_meteo_current=bool(weather_obs and weather_obs.availability is ObservationAvailability.CURRENT),
+            nws_forecast=forecast,
+            nws_current=bool(forecast_obs and forecast_obs.availability is ObservationAvailability.CURRENT),
+        )
+        if state is None:
+            observations = (Observation.unavailable("weather.fusion", "no current source available for current-weather estimate"),)
+        else:
+            observations = (Observation.observed("weather.fusion", state),)
         ingest_observation_batch(
             self.context,
-            entity_id=WEATHER_ENTITY_ID,
-            adapter_id=self.weather_adapter.ADAPTER_ID,
-            observations=self.weather_adapter.collect(),
+            entity_id=ESTIMATE_ENTITY_ID,
+            adapter_id="weather.fusion",
+            observations=observations,
             publish_cycle=False,
         )
+
+    def _collect_weather(self) -> None:
+        ingest_observation_batch(self.context, entity_id=WEATHER_ENTITY_ID, adapter_id=self.weather_adapter.ADAPTER_ID, observations=self.weather_adapter.collect(), publish_cycle=False)
+        self._recompute_estimate()
 
     def _collect_alerts(self) -> None:
-        ingest_observation_batch(
-            self.context,
-            entity_id=ALERTS_ENTITY_ID,
-            adapter_id=self.alerts_adapter.ADAPTER_ID,
-            observations=self.alerts_adapter.collect(),
-            publish_cycle=False,
-        )
+        ingest_observation_batch(self.context, entity_id=ALERTS_ENTITY_ID, adapter_id=self.alerts_adapter.ADAPTER_ID, observations=self.alerts_adapter.collect(), publish_cycle=False)
+
+    def _collect_surface(self) -> None:
+        ingest_observation_batch(self.context, entity_id=SURFACE_ENTITY_ID, adapter_id=self.surface_adapter.ADAPTER_ID, observations=self.surface_adapter.collect(), publish_cycle=False)
+        self._recompute_estimate()
+
+    def _collect_forecast(self) -> None:
+        ingest_observation_batch(self.context, entity_id=FORECAST_ENTITY_ID, adapter_id=self.forecast_adapter.ADAPTER_ID, observations=self.forecast_adapter.collect(), publish_cycle=False)
+        self._recompute_estimate()
 
     def _run(self) -> None:
-        next_weather = 0.0
-        next_alerts = 0.0
+        next_due = {"alerts": 0.0, "surface": 0.0, "weather": 0.0, "forecast": 0.0}
+        intervals = {
+            "alerts": self.config.alerts.interval_seconds,
+            "surface": self.config.surface.interval_seconds,
+            "weather": self.config.weather.interval_seconds,
+            "forecast": self.config.forecast.interval_seconds,
+        }
+        enabled = {
+            "alerts": self.config.alerts.enabled,
+            "surface": self.config.surface.enabled,
+            "weather": self.config.weather.enabled,
+            "forecast": self.config.forecast.enabled,
+        }
+        collectors = {
+            "alerts": self._collect_alerts,
+            "surface": self._collect_surface,
+            "weather": self._collect_weather,
+            "forecast": self._collect_forecast,
+        }
 
         while not self._stop.is_set():
             now = time.monotonic()
+            for name in ("alerts", "surface", "weather", "forecast"):
+                if not enabled[name] or now < next_due[name]:
+                    continue
+                collectors[name]()
+                next_due[name] = time.monotonic() + intervals[name]
+                if self._stop.is_set():
+                    break
+                now = time.monotonic()
 
-            if self.config.weather.enabled and now >= next_weather:
-                self._collect_weather()
-                next_weather = time.monotonic() + self.config.weather.interval_seconds
-
-            if self._stop.is_set():
-                break
-
-            if self.config.alerts.enabled and now >= next_alerts:
-                self._collect_alerts()
-                next_alerts = time.monotonic() + self.config.alerts.interval_seconds
-
-            due = [
-                value
-                for enabled, value in (
-                    (self.config.weather.enabled, next_weather),
-                    (self.config.alerts.enabled, next_alerts),
-                )
-                if enabled
-            ]
+            due = [next_due[name] for name in next_due if enabled[name]]
             wait_for = 1.0 if not due else max(0.1, min(due) - time.monotonic())
             self._stop.wait(min(wait_for, 1.0))
