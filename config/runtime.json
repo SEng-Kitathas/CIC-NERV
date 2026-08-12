@@ -24,13 +24,13 @@
       "enabled": true,
       "interval_seconds": 60.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.3 (local personal system)"
+      "user_agent": "Personal-CIC/0.3.4 (local personal system)"
     },
     "surface": {
       "enabled": true,
       "interval_seconds": 60.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.3 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.4 (local personal system)",
       "station_ids": [
         "KEQY",
         "KCLT",
@@ -42,19 +42,24 @@
       "enabled": true,
       "interval_seconds": 300.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.3 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.4 (local personal system)",
       "points_refresh_seconds": 21600.0
     },
     "radar": {
       "enabled": true,
       "interval_seconds": 120.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.3 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.4 (local personal system)",
       "range_miles": 75.0,
       "image_width": 900,
       "image_height": 600,
       "max_age_minutes": 15.0,
-      "cache_dir": "state/radar"
+      "cache_dir": "state/radar",
+      "loop_frame_capacity": 15,
+      "context_enabled": true,
+      "context_interval_seconds": 21600.0,
+      "context_timeout_seconds": 8.0,
+      "context_max_age_days": 30.0
     }
   }
 }

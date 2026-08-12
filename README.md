@@ -151,4 +151,8 @@ The World API remains read-only:
 GET http://127.0.0.1:8765/api/v1/world
 ```
 
-- 0.3.3 adds local NOAA/NWS MRMS radar imagery with warning overlay, source age, and loopback-only cached image delivery.
+- 0.3.3 adds local NOAA/NWS MRMS radar imagery with warning overlay, source-stream/frame provenance, and loopback-only cached image delivery.
+
+### 0.3.4 Radar Context + Loop
+
+The World surface adds a subdued locally cached TIGERweb reference overlay and a bounded real-frame MRMS playback loop. Each frame remains hash-addressed and timestamped; no interpolation is synthesized, and normal loop turnover is sample telemetry.

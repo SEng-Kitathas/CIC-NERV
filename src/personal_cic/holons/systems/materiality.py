@@ -18,6 +18,7 @@ from personal_cic.core.world.components import (
     NWSHourlyForecastState,
     CurrentWeatherEstimateState,
     RadarMosaicState,
+    RadarContextState,
 )
 
 
@@ -202,6 +203,25 @@ def telemetry_significance(
         new_semantic = (None if new is None else new.short_forecast, pop_band(new))
         return "material" if old_semantic != new_semantic else "sample"
 
+
+    if isinstance(current, RadarContextState) and isinstance(previous, RadarContextState):
+        old_semantic = (
+            previous.provider,
+            round(previous.west, 5),
+            round(previous.south, 5),
+            round(previous.east, 5),
+            round(previous.north, 5),
+            previous.content_sha256,
+        )
+        new_semantic = (
+            current.provider,
+            round(current.west, 5),
+            round(current.south, 5),
+            round(current.east, 5),
+            round(current.north, 5),
+            current.content_sha256,
+        )
+        return "material" if old_semantic != new_semantic else "sample"
 
     if isinstance(current, RadarMosaicState) and isinstance(previous, RadarMosaicState):
         # A new 2-minute image frame is sample telemetry. Durable history records

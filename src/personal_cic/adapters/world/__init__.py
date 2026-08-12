@@ -3,6 +3,7 @@ from .nws_alerts import NWSAlertsAdapter
 from .nws_forecast import NWSHourlyForecastAdapter
 from .open_meteo import OpenMeteoWeatherAdapter
 from .radar_mosaic import MRMSRadarMosaicAdapter
+from .radar_context import TIGERRadarContextAdapter
 
 __all__ = [
     "AviationSurfaceAdapter",
@@ -10,4 +11,5 @@ __all__ = [
     "NWSHourlyForecastAdapter",
     "OpenMeteoWeatherAdapter",
     "MRMSRadarMosaicAdapter",
+    "TIGERRadarContextAdapter",
 ]

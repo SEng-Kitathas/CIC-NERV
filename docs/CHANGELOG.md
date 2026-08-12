@@ -1,5 +1,34 @@
 # Changelog
 
+### 0.3.4 RC2 — Radar loop playback stability
+
+- Repairs browser loop-state synchronization so the 5-second World API refresh no longer resets an active radar loop to the newest frame.
+- Requires three distinct observed radar frames before autoplay begins; two-frame collections remain inspectable with step controls but are not presented as useful motion.
+- Adds accessible previous/next/play control labels and corrects the target HMI gate to verify control identity rather than literal PREV/NEXT text.
+- No radar collection, provenance, context, re-entry, or materiality semantics change from RC1.
+
+
+## 0.3.4 — Slice 003d Radar Context + Loop
+
+- Adds a restrained Census TIGERweb vector context layer over the local MRMS radar view: county boundaries, generalized primary roads, Interstate/US-highway context, and sparse place labels.
+- Keeps geographic context as separately sourced reference data rather than meteorological evidence; the browser consumes only hash-bound loopback-cached context JSON.
+- Separates context artifact identity (`context_sha256`) from retrieval-invariant semantic content identity (`content_sha256`) so a routine six-hour refresh cannot fabricate durable history.
+- Adds a bounded immutable recent-frame cache and frame manifest for real observed WMS radar playback; no frame interpolation or synthetic tweening is performed.
+- Retains the NWS warning overlay captured in the same collection cycle as each cached radar frame so historical loop frames do not receive the current warning overlay.
+- Auto-runs the loop after two distinct observed frames exist; play/pause and frame-step controls remain operator-accessible.
+- Adds explicit range-ring labels and collision-suppressed place labels for professional spatial context without consumer map tiles.
+- Keeps ordinary frame-list growth, frame hashes, retrieval times, and stream-witness turnover as sample telemetry rather than durable journal history.
+
+## 0.3.3 — Slice 003c Radar Spatial Awareness
+
+- Adds verified NOAA/NWS MRMS BREF.QCD local radar imagery with NWS short-fuse warning overlay.
+- Separates MRMS distribution-stream freshness from independent WMS frame retrieval/hash provenance.
+- Preserves equal-distance radar geometry across the 900x600 raster and 75-mile centered range rings.
+- Hash-binds locally served radar imagery and rejects mismatched frame identities.
+- Withdraws/re-earns radar observation authority across process re-entry.
+- Treats routine radar frame/hash/timestamp churn as sample telemetry and structural radar changes as durable material events.
+- Keeps `state/radar/` runtime cache outside Git history.
+
 ## 0.3.2 — Slice 003b WX Fusion Foundation
 
 - Adds NOAA/NWS AviationWeather.gov METAR surface-observation network support for KEQY/KCLT/KJQF.
@@ -113,10 +142,3 @@
 - Stop journaling transient missing signal fields as durable Wi-Fi domain changes.
 - Treat normal frequency/channel roaming as live radio telemetry rather than durable operational history.
 - Preserve link/disconnect, SSID, interface, and IP structural transitions as material.
-
-## 0.3.3
-- Clarify radar provenance: the RIDGEII latest-product timestamp is a source-stream freshness witness, while the WMS raster has independent retrieval-time/hash identity; no false GeoTIFF↔WMS frame binding is asserted.
-- Ignore runtime-owned `state/radar/` cache artifacts so live collection cannot dirty Git checkpoints.
-
-- Add NOAA/NWS MRMS BREF.QCD local radar mosaic and NWS warning overlay.
-- Add radar source-age metadata, re-entry withdrawal, sample-vs-material frame semantics, and loopback cached image endpoints.

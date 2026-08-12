@@ -245,6 +245,14 @@ class CurrentWeatherEstimateState:
 
 
 @dataclass(frozen=True, slots=True)
+class RadarFrameReference:
+    retrieved_at: str
+    image_sha256: str
+    warning_image_sha256: str | None
+    stream_witness_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class RadarMosaicState:
     location_label: str
     provider: str
@@ -265,3 +273,22 @@ class RadarMosaicState:
     warning_image_sha256: str | None
     legend_available: bool
     legend_image_sha256: str | None
+    frames: tuple[RadarFrameReference, ...] = ()
+    loop_frame_capacity: int = 15
+
+
+@dataclass(frozen=True, slots=True)
+class RadarContextState:
+    location_label: str
+    provider: str
+    retrieved_at: str
+    west: float
+    south: float
+    east: float
+    north: float
+    context_sha256: str
+    content_sha256: str
+    county_count: int
+    primary_road_count: int
+    secondary_road_count: int
+    place_count: int

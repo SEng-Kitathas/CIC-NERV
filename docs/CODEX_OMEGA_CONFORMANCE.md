@@ -54,3 +54,11 @@ A residual becomes P0 only when it creates a demonstrated correctness, authority
 ### Radar semantic home
 
 Radar metadata authority lives in `RadarMosaicState`; raw image bytes remain adapter cache artifacts and do not become competing WorldState truth. Provider failure withdraws observation authority without inventing a new radar domain value.
+
+## 0.3.4 radar context / loop conformance
+
+- **Semantic home:** WorldState owns typed radar/context metadata; cache bytes/manifests remain adapter-owned artifacts.
+- **Provenance:** each loop frame is hash-addressed with explicit WMS retrieval time; MRMS stream time remains only a stream-freshness witness.
+- **Authority separation:** Census map context is reference geometry, not weather evidence; warning overlays retain radar-observation authority rules.
+- **Materiality:** ordinary frame-set turnover and context retrieval-time refresh are sample telemetry; semantic context content and structural radar authority changes remain material.
+- **Presentation boundary:** browser access is loopback-only and hash-checked; it does not contact NOAA/NWS/Census providers directly.

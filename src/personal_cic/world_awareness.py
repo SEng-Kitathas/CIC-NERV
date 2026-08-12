@@ -9,6 +9,7 @@ from personal_cic.adapters.world import (
     NWSHourlyForecastAdapter,
     OpenMeteoWeatherAdapter,
     MRMSRadarMosaicAdapter,
+    TIGERRadarContextAdapter,
 )
 from personal_cic.bootstrap import RuntimeContext, ingest_observation_batch
 from personal_cic.core.config import WorldAwarenessConfig
@@ -28,6 +29,7 @@ SURFACE_ENTITY_ID = "local-weather-surface"
 FORECAST_ENTITY_ID = "local-weather-nws-forecast"
 ESTIMATE_ENTITY_ID = "local-weather-estimate"
 RADAR_ENTITY_ID = "local-weather-radar"
+RADAR_CONTEXT_ENTITY_ID = "local-weather-radar-context"
 
 
 class WorldAwarenessWorker:
@@ -76,8 +78,21 @@ class WorldAwarenessWorker:
             image_height=config.radar.image_height,
             max_age_minutes=config.radar.max_age_minutes,
             cache_dir=config.radar.cache_dir,
+            loop_frame_capacity=config.radar.loop_frame_capacity,
             user_agent=config.radar.user_agent,
             timeout_seconds=config.radar.timeout_seconds,
+        )
+        self.radar_context_adapter = TIGERRadarContextAdapter(
+            location_label=loc.label,
+            latitude=loc.latitude,
+            longitude=loc.longitude,
+            range_miles=config.radar.range_miles,
+            image_width=config.radar.image_width,
+            image_height=config.radar.image_height,
+            cache_dir=config.radar.cache_dir,
+            user_agent=config.radar.user_agent,
+            max_age_days=config.radar.context_max_age_days,
+            timeout_seconds=config.radar.context_timeout_seconds,
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -89,6 +104,7 @@ class WorldAwarenessWorker:
         self.context.world.ensure_entity(FORECAST_ENTITY_ID, "NWS Hourly Forecast")
         self.context.world.ensure_entity(ESTIMATE_ENTITY_ID, "Current Weather Estimate")
         self.context.world.ensure_entity(RADAR_ENTITY_ID, "Local Radar Mosaic")
+        self.context.world.ensure_entity(RADAR_CONTEXT_ENTITY_ID, "Local Radar Context")
 
     def _withdraw(self, entity_id: str, adapter_id: str, reason: str) -> None:
         ingest_observation_batch(
@@ -113,6 +129,12 @@ class WorldAwarenessWorker:
             self._withdraw(FORECAST_ENTITY_ID, self.forecast_adapter.ADAPTER_ID, "awaiting fresh NWS hourly forecast")
         if self.config.radar.enabled:
             self._withdraw(RADAR_ENTITY_ID, self.radar_adapter.ADAPTER_ID, "awaiting fresh MRMS radar observation")
+        if self.config.radar.enabled and self.config.radar.context_enabled:
+            self._withdraw(
+                RADAR_CONTEXT_ENTITY_ID,
+                self.radar_context_adapter.ADAPTER_ID,
+                "awaiting fresh TIGERweb radar context observation",
+            )
         self._withdraw(ESTIMATE_ENTITY_ID, "weather.fusion", "awaiting fresh current-weather source")
 
     def start(self) -> None:
@@ -131,6 +153,7 @@ class WorldAwarenessWorker:
                 self.config.surface.timeout_seconds,
                 self.config.forecast.timeout_seconds * 2,
                 self.config.radar.timeout_seconds * 4,
+                self.config.radar.context_timeout_seconds * 2,
             ) + 2.0
             self._thread.join(timeout=timeout)
         self._thread = None
@@ -187,14 +210,24 @@ class WorldAwarenessWorker:
             publish_cycle=False,
         )
 
+    def _collect_radar_context(self) -> None:
+        ingest_observation_batch(
+            self.context,
+            entity_id=RADAR_CONTEXT_ENTITY_ID,
+            adapter_id=self.radar_context_adapter.ADAPTER_ID,
+            observations=self.radar_context_adapter.collect(),
+            publish_cycle=False,
+        )
+
     def _run(self) -> None:
-        next_due = {"alerts": 0.0, "surface": 0.0, "weather": 0.0, "forecast": 0.0, "radar": 0.0}
+        next_due = {"alerts": 0.0, "surface": 0.0, "weather": 0.0, "forecast": 0.0, "radar": 0.0, "radar_context": 0.0}
         intervals = {
             "alerts": self.config.alerts.interval_seconds,
             "surface": self.config.surface.interval_seconds,
             "weather": self.config.weather.interval_seconds,
             "forecast": self.config.forecast.interval_seconds,
             "radar": self.config.radar.interval_seconds,
+            "radar_context": self.config.radar.context_interval_seconds,
         }
         enabled = {
             "alerts": self.config.alerts.enabled,
@@ -202,6 +235,7 @@ class WorldAwarenessWorker:
             "weather": self.config.weather.enabled,
             "forecast": self.config.forecast.enabled,
             "radar": self.config.radar.enabled,
+            "radar_context": self.config.radar.enabled and self.config.radar.context_enabled,
         }
         collectors = {
             "alerts": self._collect_alerts,
@@ -209,11 +243,12 @@ class WorldAwarenessWorker:
             "weather": self._collect_weather,
             "forecast": self._collect_forecast,
             "radar": self._collect_radar,
+            "radar_context": self._collect_radar_context,
         }
 
         while not self._stop.is_set():
             now = time.monotonic()
-            for name in ("alerts", "surface", "weather", "forecast", "radar"):
+            for name in ("alerts", "surface", "weather", "forecast", "radar", "radar_context"):
                 if not enabled[name] or now < next_due[name]:
                     continue
                 collectors[name]()

@@ -27,6 +27,8 @@ from personal_cic.core.world.components import (
     SurfaceObservationNetworkState,
     SurfaceStationObservation,
     RadarMosaicState,
+    RadarFrameReference,
+    RadarContextState,
 )
 from personal_cic.presentation import (
     PresentationServer,
@@ -218,10 +220,19 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("RADAR // MRMS BREF.QCD + NWS WARNINGS", body)
         self.assertIn("MRMS STREAM AGE", body)
         self.assertIn("id=\"radar-image\"", body)
-        self.assertIn("rd.image_url", body)
+        self.assertIn("syncRadarFrames", body)
         self.assertIn("id=\"radar-stage\"", body)
         self.assertIn("rs.style.aspectRatio", body)
         self.assertIn("rd.warning_overlay_current", body)
+        self.assertIn('id="radar-context"', body)
+        self.assertIn('id="radar-play"', body)
+        self.assertIn('id="radar-prev"', body)
+        self.assertIn('id="radar-next"', body)
+        self.assertIn("radarAutoplay=true", body)
+        self.assertIn("WMS RETR", body)
+        self.assertIn("MRMS STREAM", body)
+        self.assertNotIn("fetch('https://tigerweb", body)
+        self.assertNotIn('fetch("https://tigerweb', body)
         with urlopen(f"http://127.0.0.1:{server.bound_port}/api/v1/world", timeout=2) as response:
             payload=json.loads(response.read())
         self.assertEqual(payload["presentation"]["mode"], "read-only")
@@ -244,7 +255,7 @@ class PresentationTests(unittest.TestCase):
         self.world.upsert_component("local-weather-estimate",estimate)
         self.world.upsert_component("local-weather-estimate",ObservationState("weather.fusion",ObservationAvailability.CURRENT,"2026-08-11T20:00:00+00:00","2026-08-11T20:00:00+00:00",()))
         projection=build_world_projection(self.world,feed=[{"category":"ALERT","title":"Test","detail":"x"}])
-        self.assertEqual(projection["api_version"],3)
+        self.assertEqual(projection["api_version"],4)
         self.assertEqual(projection["surface"]["selected_station_id"],"KEQY")
         self.assertEqual(projection["surface"]["wind_speed_median_mph"],10.0)
         self.assertEqual(projection["surface"]["wind_gust_max_mph"],15.0)
@@ -272,11 +283,18 @@ class PresentationTests(unittest.TestCase):
             range_miles=75.0,
             image_width=900,
             image_height=600,
-            image_sha256="abc123",
+            image_sha256="a" * 64,
             warning_overlay_available=True,
-            warning_image_sha256="warn123",
+            warning_image_sha256="b" * 64,
             legend_available=True,
-            legend_image_sha256="legend123",
+            legend_image_sha256="c" * 64,
+            frames=(RadarFrameReference(
+                "2026-08-12T01:04:05+00:00",
+                "a" * 64,
+                "b" * 64,
+                "2026-08-12T01:04:00+00:00",
+            ),),
+            loop_frame_capacity=15,
         )
         self.world.upsert_component("local-weather-radar", state)
         self.world.upsert_component(
@@ -293,8 +311,10 @@ class PresentationTests(unittest.TestCase):
         radar = projection["radar"]
         self.assertTrue(radar["current_now"])
         self.assertTrue(radar["displayable_now"])
-        self.assertIn("/radar/latest.png?sha=abc123", radar["image_url"])
-        self.assertIn("/radar/warnings.png?sha=warn123", radar["warning_image_url"])
+        self.assertEqual(radar["image_url"], "/radar/frames/" + "a" * 64 + ".png")
+        self.assertEqual(radar["warning_image_url"], "/radar/warning-frames/" + "b" * 64 + ".png")
+        self.assertEqual(len(radar["frames"]), 1)
+        self.assertEqual(radar["frames"][0]["image_url"], radar["image_url"])
         self.assertNotIn("http", radar["image_url"])
 
     def test_unavailable_radar_keeps_last_known_frame_but_never_current_warning_overlay(self):
@@ -314,11 +334,11 @@ class PresentationTests(unittest.TestCase):
             range_miles=75.0,
             image_width=900,
             image_height=600,
-            image_sha256="abc123",
+            image_sha256="a" * 64,
             warning_overlay_available=True,
-            warning_image_sha256="warn123",
+            warning_image_sha256="b" * 64,
             legend_available=True,
-            legend_image_sha256="legend123",
+            legend_image_sha256="c" * 64,
         )
         self.world.upsert_component("local-weather-radar", state)
         self.world.upsert_component(
@@ -400,6 +420,97 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("replaceChildren()", body)
         self.assertNotIn("tr.innerHTML=", body)
         self.assertNotIn("div.innerHTML=", body)
+    def test_world_projection_exposes_hash_bound_radar_context(self):
+        self.world.ensure_entity("local-weather-radar-context", "Radar Context")
+        state = RadarContextState(
+            location_label="Test",
+            provider="U.S. Census Bureau TIGERweb",
+            retrieved_at="2026-08-12T01:00:00+00:00",
+            west=-82.0, south=34.0, east=-79.0, north=36.0,
+            context_sha256="d" * 64,
+            content_sha256="e" * 64,
+            county_count=3, primary_road_count=5, secondary_road_count=7, place_count=9,
+        )
+        self.world.upsert_component("local-weather-radar-context", state)
+        self.world.upsert_component(
+            "local-weather-radar-context",
+            ObservationState(
+                "census.tiger.radar_context", ObservationAvailability.CURRENT,
+                "2026-08-12T01:00:00+00:00", "2026-08-12T01:00:00+00:00", (),
+            ),
+        )
+        context = build_world_projection(self.world)["radar_context"]
+        self.assertEqual(context["context_state"], "CURRENT")
+        self.assertEqual(context["content_sha256"], "e" * 64)
+        self.assertEqual(context["context_url"], "/radar/context.json?sha=" + "d" * 64)
+
+    def test_http_server_serves_hash_named_loop_frames_and_context_only(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            frames = cache / "frames"
+            warnings = cache / "warning_frames"
+            frames.mkdir(); warnings.mkdir()
+            radar = b"\x89PNG\r\n\x1a\nframe"
+            warning = b"\x89PNG\r\n\x1a\nwarning-frame"
+            radar_hash = sha256(radar).hexdigest()
+            warning_hash = sha256(warning).hexdigest()
+            (frames / f"{radar_hash}.png").write_bytes(radar)
+            (warnings / f"{warning_hash}.png").write_bytes(warning)
+            context = json.dumps({"provider": "Census", "counties": []}, sort_keys=True).encode()
+            context_hash = sha256(context).hexdigest()
+            (cache / "context.json").write_bytes(context)
+
+            server = PresentationServer(
+                world=self.world, host="127.0.0.1", port=0,
+                runtime_metadata=lambda: {}, radar_cache_dir=cache,
+            )
+            server.start(); self.addCleanup(server.stop)
+            base = f"http://127.0.0.1:{server.bound_port}"
+
+            with urlopen(base + f"/radar/frames/{radar_hash}.png", timeout=2) as response:
+                self.assertEqual(response.read(), radar)
+            with urlopen(base + f"/radar/warning-frames/{warning_hash}.png", timeout=2) as response:
+                self.assertEqual(response.read(), warning)
+            with urlopen(base + f"/radar/context.json?sha={context_hash}", timeout=2) as response:
+                self.assertEqual(response.read(), context)
+
+            with self.assertRaises(HTTPError) as wrong_context:
+                urlopen(base + "/radar/context.json?sha=" + "0" * 64, timeout=2)
+            self.assertEqual(wrong_context.exception.code, 409)
+
+            with self.assertRaises(HTTPError) as invalid_frame:
+                urlopen(base + "/radar/frames/not-a-hash.png", timeout=2)
+            self.assertEqual(invalid_frame.exception.code, 400)
+
+    def test_world_page_uses_safe_local_context_and_real_frame_loop_controls(self):
+        from personal_cic.presentation.pages import WORLD_HTML
+
+        for marker in (
+            'id="radar-context"', 'id="radar-play"', 'id="radar-prev"',
+            'id="radar-next"', 'radarAutoplay=true', 'syncRadarFrames',
+            'warning_image_url', 'WMS RETR', 'MRMS STREAM',
+            'id="radar-ring-1"', 'id="radar-ring-3"',
+        ):
+            self.assertIn(marker, WORLD_HTML)
+        self.assertIn("text.textContent", WORLD_HTML)
+        self.assertNotIn("context.innerHTML", WORLD_HTML)
+        self.assertNotIn("fetch('https://tigerweb", WORLD_HTML)
+        self.assertNotIn('fetch("https://tigerweb', WORLD_HTML)
+
+    def test_radar_loop_refresh_preserves_playback_position_and_requires_three_frames(self):
+        from personal_cic.presentation.pages import WORLD_HTML
+
+        self.assertIn("const radarAutoplayMinFrames=3", WORLD_HTML)
+        self.assertIn("if(next<0)next=radarFrames.length-1", WORLD_HTML)
+        self.assertNotIn("if(next<0||radarPlaying||radarAutoplay)", WORLD_HTML)
+        self.assertIn("radarFrames.length>=radarAutoplayMinFrames", WORLD_HTML)
+        self.assertIn("building distinct frames // autoplay at", WORLD_HTML)
+        self.assertIn('aria-label="Previous radar frame"', WORLD_HTML)
+        self.assertIn('aria-label="Next radar frame"', WORLD_HTML)
+
 
 if __name__ == "__main__":
     unittest.main()

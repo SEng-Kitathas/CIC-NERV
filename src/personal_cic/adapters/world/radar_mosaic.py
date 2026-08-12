@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 from math import cos, radians
 from pathlib import Path
 import re
@@ -11,7 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from personal_cic.core.observations import Observation
-from personal_cic.core.world.components import RadarMosaicState
+from personal_cic.core.world.components import RadarFrameReference, RadarMosaicState
 
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -25,18 +26,42 @@ class RadarImagePaths:
     radar: Path
     warnings: Path
     legend: Path
+    frames: Path
+    warning_frames: Path
+    manifest: Path
+
+
+def radar_bbox(
+    *,
+    latitude: float,
+    longitude: float,
+    range_miles: float,
+    image_width: int,
+    image_height: int,
+) -> tuple[float, float, float, float]:
+    """Return an EPSG:4326 bbox whose physical aspect matches the raster."""
+
+    aspect = image_width / image_height
+    vertical_half_miles = range_miles
+    horizontal_half_miles = range_miles * aspect
+    lat_delta = vertical_half_miles / 69.0
+    lon_scale = max(0.2, cos(radians(latitude)))
+    lon_delta = horizontal_half_miles / (69.0 * lon_scale)
+    return (
+        longitude - lon_delta,
+        latitude - lat_delta,
+        longitude + lon_delta,
+        latitude + lat_delta,
+    )
 
 
 class MRMSRadarMosaicAdapter:
-    """Normalize the latest NOAA/NWS CONUS MRMS base-reflectivity mosaic.
+    """Normalize NOAA/NWS MRMS reflectivity into a bounded local frame sequence.
 
-    Domain truth is metadata in WorldState. Rendered PNGs are adapter-owned cache
-    artifacts served read-only by the local presentation boundary; image bytes do
-    not become giant WorldState/snapshot components.
-
-    The RIDGEII filename/timestamp is a source-stream freshness witness. The WMS
-    image request is an independently retrieved latest render and is not claimed
-    to be byte-for-byte or temporally bound to that specific GeoTIFF product.
+    WorldState owns typed frame/provenance metadata. Image bytes and the small
+    loop manifest are adapter-owned cache artifacts. The RIDGEII product index is
+    only a source-stream freshness witness; each WMS frame remains independently
+    identified by retrieval time and content hash.
     """
 
     ADAPTER_ID = "nws.mrms.radar"
@@ -56,6 +81,7 @@ class MRMSRadarMosaicAdapter:
         image_height: int,
         max_age_minutes: float,
         cache_dir: Path,
+        loop_frame_capacity: int = 15,
         user_agent: str,
         timeout_seconds: float = 8.0,
         metadata_url: str = "https://mrms.ncep.noaa.gov/RIDGEII/L2/CONUS/BREF_QCD/",
@@ -72,6 +98,7 @@ class MRMSRadarMosaicAdapter:
         self.image_height = image_height
         self.max_age_minutes = max_age_minutes
         self.cache_dir = Path(cache_dir)
+        self.loop_frame_capacity = loop_frame_capacity
         self.user_agent = user_agent
         self.timeout_seconds = timeout_seconds
         self.metadata_url = metadata_url
@@ -86,15 +113,15 @@ class MRMSRadarMosaicAdapter:
             radar=self.cache_dir / "latest.png",
             warnings=self.cache_dir / "warnings.png",
             legend=self.cache_dir / "legend.png",
+            frames=self.cache_dir / "frames",
+            warning_frames=self.cache_dir / "warning_frames",
+            manifest=self.cache_dir / "frames.json",
         )
 
     def _request(self, url: str, accept: str) -> bytes:
         request = Request(
             url,
-            headers={
-                "User-Agent": self.user_agent,
-                "Accept": accept,
-            },
+            headers={"User-Agent": self.user_agent, "Accept": accept},
         )
         with self.opener(request, timeout=self.timeout_seconds) as response:
             return response.read()
@@ -117,31 +144,15 @@ class MRMSRadarMosaicAdapter:
         return filename, observed
 
     def _bbox(self) -> tuple[float, float, float, float]:
-        # `range_miles` is the radius of the largest centered range ring and
-        # therefore the vertical half-extent of the image. Expand the horizontal
-        # geographic extent by the pixel aspect ratio so the WMS render has
-        # approximately equal miles-per-pixel in both axes instead of stretching
-        # a square physical area into a 3:2 image.
-        aspect = self.image_width / self.image_height
-        vertical_half_miles = self.range_miles
-        horizontal_half_miles = self.range_miles * aspect
-        lat_delta = vertical_half_miles / 69.0
-        lon_scale = max(0.2, cos(radians(self.latitude)))
-        lon_delta = horizontal_half_miles / (69.0 * lon_scale)
-        return (
-            self.longitude - lon_delta,
-            self.latitude - lat_delta,
-            self.longitude + lon_delta,
-            self.latitude + lat_delta,
+        return radar_bbox(
+            latitude=self.latitude,
+            longitude=self.longitude,
+            range_miles=self.range_miles,
+            image_width=self.image_width,
+            image_height=self.image_height,
         )
 
-    def _wms_url(
-        self,
-        base_url: str,
-        *,
-        layer: str,
-        transparent: bool,
-    ) -> str:
+    def _wms_url(self, base_url: str, *, layer: str, transparent: bool) -> str:
         west, south, east, north = self._bbox()
         params = {
             "SERVICE": "WMS",
@@ -184,6 +195,168 @@ class MRMSRadarMosaicAdapter:
         tmp.write_bytes(payload)
         tmp.replace(path)
 
+    @staticmethod
+    def _utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _file_matches_hash(path: Path, expected_sha: str) -> bool:
+        try:
+            return path.is_file() and sha256(path.read_bytes()).hexdigest() == expected_sha
+        except OSError:
+            return False
+
+    @staticmethod
+    def _valid_frame_ref(frame: RadarFrameReference) -> bool:
+        if re.fullmatch(r"[0-9a-f]{64}", frame.image_sha256) is None:
+            return False
+        if (
+            frame.warning_image_sha256 is not None
+            and re.fullmatch(r"[0-9a-f]{64}", frame.warning_image_sha256) is None
+        ):
+            return False
+        try:
+            datetime.fromisoformat(frame.retrieved_at)
+            datetime.fromisoformat(frame.stream_witness_at)
+        except ValueError:
+            return False
+        return True
+
+    def _load_manifest(self) -> list[RadarFrameReference]:
+        path = self.image_paths.manifest
+        if not path.exists():
+            return []
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        result: list[RadarFrameReference] = []
+        for item in payload.get("frames", []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                frame = RadarFrameReference(
+                    retrieved_at=str(item["retrieved_at"]),
+                    image_sha256=str(item["image_sha256"]),
+                    warning_image_sha256=(
+                        None
+                        if item.get("warning_image_sha256") is None
+                        else str(item.get("warning_image_sha256"))
+                    ),
+                    stream_witness_at=str(item["stream_witness_at"]),
+                )
+            except KeyError:
+                continue
+            if not self._valid_frame_ref(frame):
+                continue
+            image_path = self.image_paths.frames / f"{frame.image_sha256}.png"
+            if not self._file_matches_hash(image_path, frame.image_sha256):
+                continue
+            if frame.warning_image_sha256:
+                warning_path = (
+                    self.image_paths.warning_frames
+                    / f"{frame.warning_image_sha256}.png"
+                )
+                if not self._file_matches_hash(
+                    warning_path, frame.warning_image_sha256
+                ):
+                    frame = RadarFrameReference(
+                        retrieved_at=frame.retrieved_at,
+                        image_sha256=frame.image_sha256,
+                        warning_image_sha256=None,
+                        stream_witness_at=frame.stream_witness_at,
+                    )
+            result.append(frame)
+        return result[-self.loop_frame_capacity :]
+
+    def _write_manifest(self, frames: list[RadarFrameReference]) -> None:
+        payload = {
+            "frames": [
+                {
+                    "retrieved_at": frame.retrieved_at,
+                    "image_sha256": frame.image_sha256,
+                    "warning_image_sha256": frame.warning_image_sha256,
+                    "stream_witness_at": frame.stream_witness_at,
+                }
+                for frame in frames
+            ]
+        }
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        self._atomic_write(self.image_paths.manifest, encoded)
+
+    def _prune_immutable_cache(self, frames: list[RadarFrameReference]) -> None:
+        keep_radar = {frame.image_sha256 for frame in frames}
+        keep_warning = {
+            frame.warning_image_sha256
+            for frame in frames
+            if frame.warning_image_sha256
+        }
+        for directory, keep in (
+            (self.image_paths.frames, keep_radar),
+            (self.image_paths.warning_frames, keep_warning),
+        ):
+            if not directory.exists():
+                continue
+            for path in directory.glob("*.png"):
+                if path.stem not in keep:
+                    path.unlink(missing_ok=True)
+
+    def _record_frame(
+        self,
+        *,
+        radar_payload: bytes,
+        warning_payload: bytes | None,
+        frame_retrieved_at: datetime,
+        stream_witness_at: datetime,
+    ) -> tuple[RadarFrameReference, ...]:
+        radar_hash = sha256(radar_payload).hexdigest()
+        warning_hash = (
+            None if warning_payload is None else sha256(warning_payload).hexdigest()
+        )
+        paths = self.image_paths
+        self._atomic_write(paths.frames / f"{radar_hash}.png", radar_payload)
+        if warning_payload is not None and warning_hash is not None:
+            self._atomic_write(
+                paths.warning_frames / f"{warning_hash}.png",
+                warning_payload,
+            )
+
+        frame = RadarFrameReference(
+            retrieved_at=frame_retrieved_at.isoformat(),
+            image_sha256=radar_hash,
+            warning_image_sha256=warning_hash,
+            stream_witness_at=stream_witness_at.isoformat(),
+        )
+        previous_frames = self._load_manifest()
+        frames = list(previous_frames)
+        signature = (frame.image_sha256, frame.warning_image_sha256)
+        if frames and (
+            frames[-1].image_sha256,
+            frames[-1].warning_image_sha256,
+        ) == signature:
+            # Do not fill the operator loop with visually identical adjacent
+            # frames. Update only the retrieval/witness timestamp for that slot.
+            frames[-1] = frame
+        else:
+            frames.append(frame)
+        frames = frames[-self.loop_frame_capacity :]
+        self._write_manifest(frames)
+        # HTTP readers can observe the previous WorldState concurrently with
+        # collection/ingest. Keep the immediately previous manifest's immutable
+        # files for one additional collection generation so a newly pruned
+        # oldest frame cannot transiently turn a still-published URL into 404.
+        # The next cycle drops that grace generation, bounding files at roughly
+        # loop capacity + one distinct frame.
+        self._prune_immutable_cache([*previous_frames, *frames])
+        return tuple(frames)
+
     def collect(self) -> tuple[Observation[object], ...]:
         try:
             listing_bytes = self._request(self.metadata_url, "text/html")
@@ -193,12 +366,9 @@ class MRMSRadarMosaicAdapter:
             if latest is None:
                 raise ValueError("MRMS listing contained no BREF.QCD products")
 
-            filename, source_time = latest
-            now = self.now()
-            if now.tzinfo is None:
-                now = now.replace(tzinfo=timezone.utc)
-            now = now.astimezone(timezone.utc)
-            age_seconds = (now - source_time).total_seconds()
+            filename, stream_time = latest
+            now = self._utc(self.now())
+            age_seconds = (now - stream_time).total_seconds()
             if age_seconds < -300:
                 raise ValueError("MRMS source product timestamp is implausibly in the future")
             if age_seconds > self.max_age_minutes * 60:
@@ -215,10 +385,7 @@ class MRMSRadarMosaicAdapter:
                 "image/png",
             )
             self._validate_png(radar_payload, "radar")
-            frame_retrieved_at = self.now()
-            if frame_retrieved_at.tzinfo is None:
-                frame_retrieved_at = frame_retrieved_at.replace(tzinfo=timezone.utc)
-            frame_retrieved_at = frame_retrieved_at.astimezone(timezone.utc)
+            frame_retrieved_at = self._utc(self.now())
 
             warning_payload: bytes | None = None
             warning_error: str | None = None
@@ -232,7 +399,7 @@ class MRMSRadarMosaicAdapter:
                     "image/png",
                 )
                 self._validate_png(warning_payload, "warning overlay")
-            except Exception as exc:  # preserve useful radar without fabricating overlay state
+            except Exception as exc:
                 warning_error = str(exc)
 
             paths = self.image_paths
@@ -261,6 +428,13 @@ class MRMSRadarMosaicAdapter:
             else:
                 paths.legend.unlink(missing_ok=True)
 
+            frames = self._record_frame(
+                radar_payload=radar_payload,
+                warning_payload=warning_payload,
+                frame_retrieved_at=frame_retrieved_at,
+                stream_witness_at=stream_time,
+            )
+
             west, south, east, north = self._bbox()
             state = RadarMosaicState(
                 location_label=self.location_label,
@@ -268,7 +442,7 @@ class MRMSRadarMosaicAdapter:
                 product=self.PRODUCT,
                 layer=self.LAYER,
                 stream_latest_filename=filename,
-                stream_latest_at=source_time.isoformat(),
+                stream_latest_at=stream_time.isoformat(),
                 frame_retrieved_at=frame_retrieved_at.isoformat(),
                 west=west,
                 south=south,
@@ -280,26 +454,32 @@ class MRMSRadarMosaicAdapter:
                 image_sha256=sha256(radar_payload).hexdigest(),
                 warning_overlay_available=warning_payload is not None,
                 warning_image_sha256=(
-                    None if warning_payload is None else sha256(warning_payload).hexdigest()
+                    None
+                    if warning_payload is None
+                    else sha256(warning_payload).hexdigest()
                 ),
                 legend_available=legend_payload is not None,
                 legend_image_sha256=(
-                    None if legend_payload is None else sha256(legend_payload).hexdigest()
+                    None
+                    if legend_payload is None
+                    else sha256(legend_payload).hexdigest()
                 ),
+                frames=frames,
+                loop_frame_capacity=self.loop_frame_capacity,
             )
             if warning_error:
                 return (
                     Observation.partial(
-                        "nws.mrms.radar",
+                        self.ADAPTER_ID,
                         state,
                         f"warning overlay unavailable: {warning_error}",
                     ),
                 )
-            return (Observation.observed("nws.mrms.radar", state),)
+            return (Observation.observed(self.ADAPTER_ID, state),)
         except Exception as exc:
             return (
                 Observation.unavailable(
-                    "nws.mrms.radar",
+                    self.ADAPTER_ID,
                     f"radar fetch failed: {exc}",
                 ),
             )

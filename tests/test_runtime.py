@@ -85,19 +85,19 @@ class RuntimeConfigTests(unittest.TestCase):
 
         self.assertEqual(
             config.surface.user_agent,
-            "Personal-CIC/0.3.3 (local personal system)",
+            "Personal-CIC/0.3.4 (local personal system)",
         )
         self.assertEqual(
             config.forecast.user_agent,
-            "Personal-CIC/0.3.3 (local personal system)",
+            "Personal-CIC/0.3.4 (local personal system)",
         )
         self.assertEqual(
             config.alerts.user_agent,
-            "Personal-CIC/0.3.3 (local personal system)",
+            "Personal-CIC/0.3.4 (local personal system)",
         )
         self.assertEqual(
             config.radar.user_agent,
-            "Personal-CIC/0.3.3 (local personal system)",
+            "Personal-CIC/0.3.4 (local personal system)",
         )
 
     def test_world_awareness_radar_config(self):
@@ -119,6 +119,46 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(config.radar.range_miles, 90.0)
         self.assertEqual(config.radar.image_width, 1000)
         self.assertEqual(config.radar.cache_dir, Path("state/test-radar"))
+        self.assertEqual(config.radar.loop_frame_capacity, 15)
+        self.assertTrue(config.radar.context_enabled)
+        self.assertEqual(config.radar.context_interval_seconds, 21600.0)
+
+    def test_world_awareness_radar_loop_and_context_config(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        config = WorldAwarenessConfig.from_mapping(
+            {
+                "enabled": True,
+                "radar": {
+                    "loop_frame_capacity": 9,
+                    "context_enabled": False,
+                    "context_interval_seconds": 7200,
+                    "context_timeout_seconds": 4,
+                    "context_max_age_days": 14,
+                },
+            }
+        )
+        self.assertEqual(config.radar.loop_frame_capacity, 9)
+        self.assertFalse(config.radar.context_enabled)
+        self.assertEqual(config.radar.context_interval_seconds, 7200.0)
+        self.assertEqual(config.radar.context_timeout_seconds, 4.0)
+        self.assertEqual(config.radar.context_max_age_days, 14.0)
+
+    def test_world_awareness_rejects_invalid_radar_loop_and_context_cadence(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        for radar in (
+            {"loop_frame_capacity": 2},
+            {"loop_frame_capacity": 31},
+            {"context_interval_seconds": 3599},
+            {"context_timeout_seconds": 0},
+            {"context_max_age_days": 0},
+        ):
+            with self.subTest(radar=radar):
+                with self.assertRaises(ValueError):
+                    WorldAwarenessConfig.from_mapping(
+                        {"enabled": True, "radar": radar}
+                    )
 
     def test_world_awareness_rejects_too_fast_radar_refresh(self):
         from personal_cic.core.config import WorldAwarenessConfig

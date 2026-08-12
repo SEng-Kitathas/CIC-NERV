@@ -140,4 +140,8 @@ Weather sources are not interchangeable votes. METAR owns observed surface repor
 
 ## Radar image cache boundary
 
-Radar image bytes are adapter-owned cache artifacts under `state/radar/`; only typed radar metadata and observation authority enter WorldState. The presentation server serves those fixed cache files read-only over loopback.
+Radar image bytes are adapter-owned cache artifacts under `state/radar/`; only typed radar metadata and observation authority enter WorldState. The presentation server serves current and immutable hash-addressed cache artifacts read-only over loopback.
+
+## 0.3.4 radar context / temporal presentation boundary
+
+Radar remains a typed current-world observation while recent image frames and map geometry remain adapter-owned presentation artifacts. `RadarMosaicState` may project a bounded sequence of hash-addressed frame references; normal sequence turnover is not durable history. `RadarContextState` separately carries exact-artifact and semantic-content hashes for Census TIGERweb reference geometry. The browser fetches both images and context only from hash-checked loopback routes. Geographic context does not acquire meteorological authority merely because it is co-rendered with radar.

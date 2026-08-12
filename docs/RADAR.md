@@ -1,4 +1,4 @@
-# Radar / Spatial Precipitation Awareness — 0.3.3
+# Radar / Spatial Precipitation Awareness — 0.3.4
 
 ## Scope
 
@@ -69,3 +69,30 @@ validated local cache instead of being downloaded every two-minute radar cycle.
 `state/radar/` is runtime-owned cache state and is ignored by Git. The repository retains only
 `state/.gitkeep`; collected radar, warning, and legend PNGs must never dirty the source tree or enter
 a checkpoint.
+
+## 0.3.4 context and loop
+
+The 0.3.4 continuation adds two presentation capabilities without changing radar truth semantics.
+
+### Geographic context
+
+Census TIGERweb reference geometry is collected server-side and cached under the radar runtime cache. The initial context set uses county boundaries, the generalized `Primary Roads 2_1M scale` layer, the Interstate/US-highway secondary-road layer, and incorporated/CDP internal points for sparse place labels. The browser never calls TIGERweb directly.
+
+`RadarContextState.context_sha256` identifies the exact cached JSON artifact served to the browser. `content_sha256` identifies the same normalized context with retrieval time removed; materiality compares the latter, so a routine refresh of unchanged geography remains sample telemetry.
+
+The vector context is deliberately subdued and rendered over the opaque radar raster. It is reference geometry, not meteorological evidence.
+
+### Recent-frame loop
+
+Each distinct observed WMS frame is stored under its SHA-256 in a bounded runtime cache together with the warning-overlay image captured during the same collection cycle. The typed frame reference carries WMS retrieval time, image hash, optional warning hash, and the contemporaneous MRMS stream-freshness witness.
+
+The loop contains only actually retrieved frames. Adjacent visually identical radar+warning pairs are de-duplicated rather than padded with fake repeated animation frames. Playback performs no interpolation or frame blending. Autoplay waits for three distinct observed frames so a two-frame cache cannot masquerade as meaningful motion. The browser preserves the currently displayed frame across its 5-second API refreshes instead of snapping playback back to newest. Once three distinct frames exist, the operator surface auto-runs the loop; play/pause and previous/next controls allow inspection.
+
+Frame-list growth and normal turnover remain sample telemetry. Radar availability, warning-overlay authority, product/bounds changes, and radar-context semantic-content changes retain material significance.
+
+
+### Context canonicalization and cache-serving grace
+
+TIGERweb feature order is normalized before semantic hashing. A provider response that contains the same county/road geometry in a different feature order therefore does not fabricate a context-content transition.
+
+The loop manifest remains bounded to the configured frame capacity. Immutable PNG files from the immediately previous manifest receive one collection-generation serving grace before pruning. This prevents a concurrent browser reading the previous WorldState from losing a still-published oldest-frame URL during the collector-to-ingest handoff, while keeping the runtime frame cache bounded to approximately the loop capacity plus one distinct frame.

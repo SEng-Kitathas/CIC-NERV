@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from hashlib import sha256
 from pathlib import Path
 import json
+import re
 from threading import Thread
 from typing import Callable
 from urllib.parse import parse_qs, urlsplit
@@ -48,35 +49,65 @@ def _handler_factory(
             self._headers(status, "application/json; charset=utf-8", len(body))
             self.wfile.write(body)
 
-        def _cached_png(self, filename: str, expected_sha: str | None):
+        def _valid_sha(self, value: str | None) -> bool:
+            return bool(value and re.fullmatch(r"[0-9a-f]{64}", value))
+
+        def _cached_png(self, relative: Path, expected_sha: str | None):
             if radar_cache_dir is None:
                 return None, "not_found", 404
-            if expected_sha is None or len(expected_sha) != 64:
+            if not self._valid_sha(expected_sha):
                 return None, "invalid_frame_identity", 400
-            try:
-                int(expected_sha, 16)
-            except ValueError:
-                return None, "invalid_frame_identity", 400
-            path = radar_cache_dir / filename
+            path = radar_cache_dir / relative
             if not path.exists() or not path.is_file():
                 return None, "not_found", 404
             payload = path.read_bytes()
             if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
                 return None, "invalid_cached_image", 500
             if sha256(payload).hexdigest() != expected_sha:
-                # WorldState metadata and adapter-owned cache must agree. A process
-                # crash between cache replacement and state/snapshot update may
-                # legitimately leave them out of sync; refuse to serve mismatched
-                # bytes rather than laundering them under an old frame identity.
                 return None, "frame_identity_mismatch", 409
             return payload, None, 200
 
-        def _send_cached_png(self, filename: str, expected_sha: str | None):
-            payload, error, status = self._cached_png(filename, expected_sha)
+        def _send_cached_png(self, relative: Path, expected_sha: str | None):
+            payload, error, status = self._cached_png(relative, expected_sha)
             if payload is None:
                 self._send_json({"error": error}, status)
                 return
             self._headers(200, "image/png", len(payload))
+            self.wfile.write(payload)
+
+        def _send_hash_named_png(self, directory: str, filename: str):
+            match = re.fullmatch(r"([0-9a-f]{64})\.png", filename)
+            if match is None:
+                self._send_json({"error": "invalid_frame_identity"}, 400)
+                return
+            expected_sha = match.group(1)
+            self._send_cached_png(Path(directory) / filename, expected_sha)
+
+        def _cached_context(self, expected_sha: str | None):
+            if radar_cache_dir is None:
+                return None, "not_found", 404
+            if not self._valid_sha(expected_sha):
+                return None, "invalid_context_identity", 400
+            path = radar_cache_dir / "context.json"
+            if not path.exists() or not path.is_file():
+                return None, "not_found", 404
+            payload = path.read_bytes()
+            if sha256(payload).hexdigest() != expected_sha:
+                return None, "context_identity_mismatch", 409
+            try:
+                value = json.loads(payload.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return None, "invalid_cached_context", 500
+            if not isinstance(value, dict):
+                return None, "invalid_cached_context", 500
+            return payload, None, 200
+
+        def _send_cached_context(self, expected_sha: str | None):
+            payload, error, status = self._cached_context(expected_sha)
+            if payload is None:
+                self._send_json({"error": error}, status)
+                return
+            self._headers(200, "application/json; charset=utf-8", len(payload))
             self.wfile.write(payload)
 
         def do_GET(self):
@@ -107,13 +138,22 @@ def _handler_factory(
                 self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
                 return
             if path == "/radar/latest.png":
-                self._send_cached_png("latest.png", (query.get("sha") or [None])[0])
+                self._send_cached_png(Path("latest.png"), (query.get("sha") or [None])[0])
                 return
             if path == "/radar/warnings.png":
-                self._send_cached_png("warnings.png", (query.get("sha") or [None])[0])
+                self._send_cached_png(Path("warnings.png"), (query.get("sha") or [None])[0])
                 return
             if path == "/radar/legend.png":
-                self._send_cached_png("legend.png", (query.get("sha") or [None])[0])
+                self._send_cached_png(Path("legend.png"), (query.get("sha") or [None])[0])
+                return
+            if path.startswith("/radar/frames/"):
+                self._send_hash_named_png("frames", path.rsplit("/", 1)[-1])
+                return
+            if path.startswith("/radar/warning-frames/"):
+                self._send_hash_named_png("warning_frames", path.rsplit("/", 1)[-1])
+                return
+            if path == "/radar/context.json":
+                self._send_cached_context((query.get("sha") or [None])[0])
                 return
             if path == "/favicon.ico":
                 self._headers(204, "image/x-icon")
@@ -135,9 +175,27 @@ def _handler_factory(
                     "/radar/legend.png": "legend.png",
                 }[path]
                 expected_sha = (query.get("sha") or [None])[0]
-                payload, _error, status = self._cached_png(filename, expected_sha)
+                payload, _error, status = self._cached_png(Path(filename), expected_sha)
                 if payload is not None:
                     self._headers(200, "image/png", len(payload))
+                else:
+                    self._headers(status, "application/json; charset=utf-8")
+            elif path.startswith("/radar/frames/") or path.startswith("/radar/warning-frames/"):
+                filename = path.rsplit("/", 1)[-1]
+                match = re.fullmatch(r"([0-9a-f]{64})\.png", filename)
+                if match is None:
+                    self._headers(400, "application/json; charset=utf-8")
+                else:
+                    directory = "frames" if path.startswith("/radar/frames/") else "warning_frames"
+                    payload, _error, status = self._cached_png(Path(directory) / filename, match.group(1))
+                    if payload is not None:
+                        self._headers(200, "image/png", len(payload))
+                    else:
+                        self._headers(status, "application/json; charset=utf-8")
+            elif path == "/radar/context.json":
+                payload, _error, status = self._cached_context((query.get("sha") or [None])[0])
+                if payload is not None:
+                    self._headers(200, "application/json; charset=utf-8", len(payload))
                 else:
                     self._headers(status, "application/json; charset=utf-8")
             else:

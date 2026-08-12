@@ -218,6 +218,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     forecast_entity = entities.get("local-weather-nws-forecast", {})
     estimate_entity = entities.get("local-weather-estimate", {})
     radar_entity = entities.get("local-weather-radar", {})
+    radar_context_entity = entities.get("local-weather-radar-context", {})
 
     weather = _component(weather_entity, "WeatherState") or {}
     forecast_daily = _component(weather_entity, "WeatherForecastState") or {}
@@ -232,6 +233,8 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     estimate_obs = _component(estimate_entity, "ObservationState") or {}
     radar = _component(radar_entity, "RadarMosaicState") or {}
     radar_obs = _component(radar_entity, "ObservationState") or {}
+    radar_context = _component(radar_context_entity, "RadarContextState") or {}
+    radar_context_obs = _component(radar_context_entity, "ObservationState") or {}
 
     weather_code = weather.get("weather_code")
     location = (
@@ -268,7 +271,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     }
 
     return {
-        "api_version": 3,
+        "api_version": 4,
         "presentation": {
             "mode": "read-only",
             "generated_at": _now_iso(),
@@ -295,6 +298,21 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
         },
         "radar": {
             **radar,
+            "frames": [
+                {
+                    **frame,
+                    "image_url": "/radar/frames/" + str(frame.get("image_sha256")) + ".png",
+                    "warning_image_url": (
+                        None
+                        if not frame.get("warning_image_sha256")
+                        else "/radar/warning-frames/"
+                        + str(frame.get("warning_image_sha256"))
+                        + ".png"
+                    ),
+                }
+                for frame in (radar.get("frames") or [])
+                if isinstance(frame, dict) and frame.get("image_sha256")
+            ],
             "current_now": radar_obs.get("availability") == "current",
             "displayable_now": bool(radar.get("image_sha256"))
             and radar_obs.get("availability") in ("current", "degraded"),
@@ -331,7 +349,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
             "image_url": (
                 None
                 if not radar.get("image_sha256")
-                else "/radar/latest.png?sha=" + str(radar.get("image_sha256"))
+                else "/radar/frames/" + str(radar.get("image_sha256")) + ".png"
             ),
             "warning_image_url": (
                 None
@@ -340,8 +358,9 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
                     radar.get("warning_overlay_available")
                     and radar_obs.get("availability") in ("current", "degraded")
                 )
-                else "/radar/warnings.png?sha="
+                else "/radar/warning-frames/"
                 + str(radar.get("warning_image_sha256"))
+                + ".png"
             ),
             "legend_image_url": (
                 None
@@ -350,6 +369,31 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
                 + str(radar.get("legend_image_sha256"))
             ),
             "observation": obs(radar_obs),
+        },
+        "radar_context": {
+            **radar_context,
+            "displayable_now": bool(radar_context.get("context_sha256")),
+            "context_state": (
+                "CURRENT"
+                if radar_context.get("context_sha256")
+                and radar_context_obs.get("availability") == "current"
+                else "DEGRADED"
+                if radar_context.get("context_sha256")
+                and radar_context_obs.get("availability") == "degraded"
+                else "LAST KNOWN"
+                if radar_context.get("context_sha256")
+                else "UNAVAILABLE"
+            ),
+            "context_age_seconds": _freshness_seconds(
+                radar_context.get("retrieved_at")
+            ),
+            "context_url": (
+                None
+                if not radar_context.get("context_sha256")
+                else "/radar/context.json?sha="
+                + str(radar_context.get("context_sha256"))
+            ),
+            "observation": obs(radar_context_obs),
         },
         "feed": list(feed or []),
     }

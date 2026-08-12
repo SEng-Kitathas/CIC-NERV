@@ -218,6 +218,203 @@ class RadarAdapterTests(unittest.TestCase):
             self.assertFalse((cache / "warnings.png").exists())
             self.assertIn("warning overlay unavailable", observation.detail)
 
+    def test_frame_loop_appends_distinct_frames_prunes_capacity_and_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "radar"
+            clock = [datetime(2026, 8, 12, 1, 5, tzinfo=timezone.utc)]
+            frame_number = [0]
+
+            def opener(request, **_kwargs):
+                url = request.full_url
+                minute = 4 + frame_number[0] * 2
+                if "RIDGEII" in url:
+                    stamp = f"20260812_01{minute:02d}00"
+                    return _Response(
+                        f"CONUS_L2_BREF_QCD_{stamp}.tif.gz".encode()
+                    )
+                if "GetLegendGraphic" in url:
+                    return _Response(LEGEND_PNG)
+                if "/wwa/warnings/" in url:
+                    return _Response(
+                        b"\x89PNG\r\n\x1a\nwarn-"
+                        + str(frame_number[0]).encode()
+                    )
+                if "conus_bref_qcd" in url:
+                    return _Response(
+                        b"\x89PNG\r\n\x1a\nradar-"
+                        + str(frame_number[0]).encode()
+                    )
+                raise AssertionError(url)
+
+            adapter = MRMSRadarMosaicAdapter(
+                location_label="Test",
+                latitude=35.1,
+                longitude=-80.6,
+                range_miles=75,
+                image_width=900,
+                image_height=600,
+                max_age_minutes=15,
+                cache_dir=cache,
+                loop_frame_capacity=3,
+                user_agent="CIC Test",
+                opener=opener,
+                now=lambda: clock[0],
+            )
+
+            states = []
+            for index in range(4):
+                frame_number[0] = index
+                clock[0] = datetime(
+                    2026, 8, 12, 1, 5 + index * 2, tzinfo=timezone.utc
+                )
+                observation = adapter.collect()[0]
+                self.assertEqual(observation.status, ObservationStatus.OBSERVED)
+                states.append(observation.value)
+
+            frames = states[-1].frames
+            self.assertEqual(len(frames), 3)
+            self.assertEqual(states[-1].loop_frame_capacity, 3)
+            self.assertTrue((cache / "frames.json").is_file())
+            self.assertEqual(len(list((cache / "frames").glob("*.png"))), 4)
+            self.assertEqual(
+                len(list((cache / "warning_frames").glob("*.png"))),
+                4,
+            )
+            self.assertNotEqual(frames[0].image_sha256, states[0].image_sha256)
+            self.assertEqual(frames[-1].image_sha256, states[-1].image_sha256)
+            # One prior-generation frame is intentionally retained as an
+            # immutable serving grace while WorldState transitions to the new
+            # manifest; it is no longer part of the projected loop.
+            self.assertEqual(len(frames), 3)
+
+    def test_identical_adjacent_frame_pair_is_deduplicated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "radar"
+            clock = [datetime(2026, 8, 12, 1, 5, tzinfo=timezone.utc)]
+            listing = [b"CONUS_L2_BREF_QCD_20260812_010400.tif.gz"]
+
+            def opener(request, **_kwargs):
+                url = request.full_url
+                if "RIDGEII" in url:
+                    return _Response(listing[0])
+                if "GetLegendGraphic" in url:
+                    return _Response(LEGEND_PNG)
+                if "/wwa/warnings/" in url:
+                    return _Response(WARN_PNG)
+                if "conus_bref_qcd" in url:
+                    return _Response(PNG)
+                raise AssertionError(url)
+
+            adapter = MRMSRadarMosaicAdapter(
+                location_label="Test", latitude=35.1, longitude=-80.6,
+                range_miles=75, image_width=900, image_height=600,
+                max_age_minutes=15, cache_dir=cache, loop_frame_capacity=5,
+                user_agent="CIC Test", opener=opener, now=lambda: clock[0],
+            )
+            first = adapter.collect()[0].value
+            clock[0] = datetime(2026, 8, 12, 1, 7, tzinfo=timezone.utc)
+            listing[0] = b"CONUS_L2_BREF_QCD_20260812_010600.tif.gz"
+            second = adapter.collect()[0].value
+
+            self.assertEqual(len(first.frames), 1)
+            self.assertEqual(len(second.frames), 1)
+            self.assertEqual(first.frames[0].image_sha256, second.frames[0].image_sha256)
+            self.assertNotEqual(first.frames[0].retrieved_at, second.frames[0].retrieved_at)
+            self.assertEqual(
+                second.frames[0].stream_witness_at,
+                "2026-08-12T01:06:00+00:00",
+            )
+
+    def test_warning_overlay_is_cached_per_historical_frame(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "radar"
+            cycle = [0]
+            clock = [datetime(2026, 8, 12, 1, 5, tzinfo=timezone.utc)]
+
+            def opener(request, **_kwargs):
+                url = request.full_url
+                if "RIDGEII" in url:
+                    minute = 4 + cycle[0] * 2
+                    return _Response(
+                        f"CONUS_L2_BREF_QCD_20260812_01{minute:02d}00.tif.gz".encode()
+                    )
+                if "GetLegendGraphic" in url:
+                    return _Response(LEGEND_PNG)
+                if "/wwa/warnings/" in url:
+                    return _Response(
+                        b"\x89PNG\r\n\x1a\nwarning-cycle-"
+                        + str(cycle[0]).encode()
+                    )
+                if "conus_bref_qcd" in url:
+                    return _Response(
+                        b"\x89PNG\r\n\x1a\nradar-cycle-"
+                        + str(cycle[0]).encode()
+                    )
+                raise AssertionError(url)
+
+            adapter = MRMSRadarMosaicAdapter(
+                location_label="Test", latitude=35.1, longitude=-80.6,
+                range_miles=75, image_width=900, image_height=600,
+                max_age_minutes=15, cache_dir=cache, loop_frame_capacity=5,
+                user_agent="CIC Test", opener=opener, now=lambda: clock[0],
+            )
+            first = adapter.collect()[0].value
+            cycle[0] = 1
+            clock[0] = datetime(2026, 8, 12, 1, 7, tzinfo=timezone.utc)
+            second = adapter.collect()[0].value
+
+            self.assertEqual(len(second.frames), 2)
+            self.assertNotEqual(
+                second.frames[0].warning_image_sha256,
+                second.frames[1].warning_image_sha256,
+            )
+            for frame in second.frames:
+                path = cache / "warning_frames" / f"{frame.warning_image_sha256}.png"
+                self.assertTrue(path.is_file())
+            self.assertEqual(first.frames[0].warning_image_sha256, second.frames[0].warning_image_sha256)
+
+    def test_corrupt_manifest_frame_is_not_projected_back_into_state(self):
+        import json
+        from hashlib import sha256
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "radar"
+            (cache / "frames").mkdir(parents=True)
+            valid = b"\x89PNG\r\n\x1a\nvalid"
+            valid_hash = sha256(valid).hexdigest()
+            (cache / "frames" / f"{valid_hash}.png").write_bytes(valid)
+            corrupt_hash = "a" * 64
+            (cache / "frames" / f"{corrupt_hash}.png").write_bytes(valid)
+            (cache / "frames.json").write_text(
+                json.dumps(
+                    {
+                        "frames": [
+                            {
+                                "retrieved_at": "2026-08-12T01:00:00+00:00",
+                                "image_sha256": corrupt_hash,
+                                "warning_image_sha256": None,
+                                "stream_witness_at": "2026-08-12T00:58:00+00:00",
+                            },
+                            {
+                                "retrieved_at": "2026-08-12T01:02:00+00:00",
+                                "image_sha256": valid_hash,
+                                "warning_image_sha256": None,
+                                "stream_witness_at": "2026-08-12T01:00:00+00:00",
+                            },
+                        ]
+                    }
+                )
+            )
+            adapter = MRMSRadarMosaicAdapter(
+                location_label="Test", latitude=35.1, longitude=-80.6,
+                range_miles=75, image_width=900, image_height=600,
+                max_age_minutes=15, cache_dir=cache, loop_frame_capacity=5,
+                user_agent="CIC Test",
+            )
+            loaded = adapter._load_manifest()
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0].image_sha256, valid_hash)
+
 
 if __name__ == "__main__":
     unittest.main()

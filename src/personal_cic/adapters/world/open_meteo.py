@@ -111,7 +111,7 @@ class OpenMeteoWeatherAdapter:
     def collect(self) -> tuple[Observation[object], ...]:
         request = Request(
             self._url(),
-            headers={"User-Agent": "Personal-CIC/0.3.1"},
+            headers={"User-Agent": "Personal-CIC/0.3.4"},
         )
         try:
             with self._opener(request, timeout=self.timeout_seconds) as response:

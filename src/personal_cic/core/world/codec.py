@@ -29,6 +29,8 @@ from .components import (
     NWSHourlyForecastState,
     CurrentWeatherEstimateState,
     RadarMosaicState,
+    RadarFrameReference,
+    RadarContextState,
 )
 
 
@@ -56,6 +58,7 @@ COMPONENT_TYPES = {
         NWSHourlyForecastState,
         CurrentWeatherEstimateState,
         RadarMosaicState,
+        RadarContextState,
     )
 }
 
@@ -118,6 +121,12 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
         if "stream_latest_at" not in values and "source_product_at" in values:
             values["stream_latest_at"] = values.pop("source_product_at")
         values.setdefault("frame_retrieved_at", None)
+        values["frames"] = tuple(
+            RadarFrameReference(**item)
+            for item in values.get("frames", [])
+            if isinstance(item, dict)
+        )
+        values.setdefault("loop_frame_capacity", 15)
     elif component_type is ObservationState:
         values["availability"] = ObservationAvailability(values["availability"])
         if isinstance(values.get("reasons"), list):

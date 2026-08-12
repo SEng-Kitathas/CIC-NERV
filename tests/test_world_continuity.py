@@ -201,6 +201,46 @@ class WorldContinuityTests(unittest.TestCase):
         # RC1 never recorded the separately retrieved WMS frame time, so the
         # migration must not invent one from the RIDGEII stream timestamp.
         self.assertIsNone(state.frame_retrieved_at)
+        self.assertEqual(state.frames, ())
+        self.assertEqual(state.loop_frame_capacity, 15)
+
+    def test_radar_frame_sequence_and_context_round_trip(self):
+        from personal_cic.core.world.components import (
+            RadarContextState, RadarFrameReference, RadarMosaicState,
+        )
+
+        frame = RadarFrameReference(
+            "2026-08-12T01:04:05+00:00", "a" * 64, "b" * 64,
+            "2026-08-12T01:04:00+00:00",
+        )
+        radar = RadarMosaicState(
+            "Test", "NOAA/NWS MRMS + NWS GeoServer", "BREF.QCD",
+            "conus_bref_qcd", "latest.tif.gz", "2026-08-12T01:04:00+00:00",
+            "2026-08-12T01:04:05+00:00", -82, 34, -79, 36, 75, 900, 600,
+            "a" * 64, True, "b" * 64, True, "c" * 64, (frame,), 15,
+        )
+        context = RadarContextState(
+            "Test", "U.S. Census Bureau TIGERweb", "2026-08-12T01:00:00+00:00",
+            -82, 34, -79, 36, "d" * 64, "e" * 64, 2, 3, 4, 5,
+        )
+        world = WorldState(EventBus())
+        world.ensure_entity("local-weather-radar", "Radar")
+        world.ensure_entity("local-weather-radar-context", "Radar Context")
+        world.upsert_component("local-weather-radar", radar)
+        world.upsert_component("local-weather-radar-context", context)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "world.json"
+            world.write_json(path)
+            restored = WorldState(EventBus())
+            restored.hydrate_json(path)
+
+        self.assertEqual(restored.get_component("local-weather-radar", RadarMosaicState), radar)
+        self.assertEqual(restored.get_component("local-weather-radar-context", RadarContextState), context)
+        self.assertIsInstance(
+            restored.get_component("local-weather-radar", RadarMosaicState).frames[0],
+            RadarFrameReference,
+        )
 
     def test_rc1_estimate_snapshot_field_names_migrate_on_hydration(self):
         from personal_cic.core.world.components import CurrentWeatherEstimateState
