@@ -246,6 +246,135 @@ class RadarConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class TrafficProviderConfig:
+    enabled: bool = True
+    interval_seconds: float = 300.0
+    timeout_seconds: float = 8.0
+
+    @classmethod
+    def from_mapping(
+        cls,
+        data: dict | None,
+        *,
+        default_interval_seconds: float,
+        min_interval_seconds: float = 30.0,
+        default_timeout_seconds: float = 8.0,
+    ) -> "TrafficProviderConfig":
+        if not data:
+            return cls(interval_seconds=default_interval_seconds, timeout_seconds=default_timeout_seconds)
+        interval = float(data.get("interval_seconds", default_interval_seconds))
+        timeout = float(data.get("timeout_seconds", default_timeout_seconds))
+        if interval < min_interval_seconds:
+            raise ValueError(f"traffic provider interval_seconds must be >= {min_interval_seconds:g}")
+        if timeout <= 0:
+            raise ValueError("traffic provider timeout_seconds must be > 0")
+        return cls(
+            enabled=bool(data.get("enabled", True)),
+            interval_seconds=interval,
+            timeout_seconds=timeout,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DriveNCTrafficConfig:
+    enabled: bool = True
+    events_interval_seconds: float = 60.0
+    cameras_interval_seconds: float = 1800.0
+    signs_interval_seconds: float = 60.0
+    timeout_seconds: float = 8.0
+    api_key_env: str = "DRIVENC_API_KEY"
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "DriveNCTrafficConfig":
+        if not data:
+            return cls()
+        events = float(data.get("events_interval_seconds", 60.0))
+        cameras = float(data.get("cameras_interval_seconds", 1800.0))
+        signs = float(data.get("signs_interval_seconds", 60.0))
+        timeout = float(data.get("timeout_seconds", 8.0))
+        api_key_env = str(data.get("api_key_env", "DRIVENC_API_KEY")).strip()
+        # DriveNC documents a ten-calls-per-60-second throttle. CIC keeps each
+        # recurring resource at or below one call per minute; startup may make
+        # three distinct calls and remains comfortably below that contract.
+        if events < 60.0 or signs < 60.0:
+            raise ValueError("DriveNC event/sign intervals must be >= 60 seconds")
+        if cameras < 300.0:
+            raise ValueError("DriveNC camera interval must be >= 300 seconds")
+        if timeout <= 0:
+            raise ValueError("DriveNC timeout_seconds must be > 0")
+        if not api_key_env:
+            raise ValueError("DriveNC api_key_env must be non-empty")
+        return cls(
+            enabled=bool(data.get("enabled", True)),
+            events_interval_seconds=events,
+            cameras_interval_seconds=cameras,
+            signs_interval_seconds=signs,
+            timeout_seconds=timeout,
+            api_key_env=api_key_env,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficConfig:
+    enabled: bool = True
+    radius_miles: float = 75.0
+    scope_counties: tuple[str, ...] = ("Union", "Mecklenburg")
+    drivenc: DriveNCTrafficConfig = field(default_factory=DriveNCTrafficConfig)
+    wzdx: TrafficProviderConfig = field(
+        default_factory=lambda: TrafficProviderConfig(interval_seconds=900.0, timeout_seconds=30.0)
+    )
+    cmpd: TrafficProviderConfig = field(
+        default_factory=lambda: TrafficProviderConfig(interval_seconds=180.0, timeout_seconds=8.0)
+    )
+    charlotte_closures: TrafficProviderConfig = field(
+        default_factory=lambda: TrafficProviderConfig(interval_seconds=900.0, timeout_seconds=8.0)
+    )
+    external_waze_visual_enabled: bool = True
+    external_waze_zoom: int = 11
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "TrafficConfig":
+        if not data:
+            return cls()
+        radius = float(data.get("radius_miles", 75.0))
+        if not 5.0 <= radius <= 300.0:
+            raise ValueError("traffic radius_miles must be between 5 and 300")
+        raw_counties = data.get("scope_counties", ["Union", "Mecklenburg"])
+        counties = tuple(str(item).strip() for item in raw_counties if str(item).strip())
+        if not counties:
+            raise ValueError("traffic scope_counties must contain at least one county")
+        zoom = int(data.get("external_waze_zoom", 11))
+        if not 3 <= zoom <= 17:
+            raise ValueError("external_waze_zoom must be between 3 and 17")
+        return cls(
+            enabled=bool(data.get("enabled", True)),
+            radius_miles=radius,
+            scope_counties=counties,
+            drivenc=DriveNCTrafficConfig.from_mapping(data.get("drivenc")),
+            wzdx=TrafficProviderConfig.from_mapping(
+                data.get("wzdx"),
+                default_interval_seconds=900.0,
+                min_interval_seconds=300.0,
+                default_timeout_seconds=30.0,
+            ),
+            cmpd=TrafficProviderConfig.from_mapping(
+                data.get("cmpd"),
+                default_interval_seconds=180.0,
+                min_interval_seconds=60.0,
+                default_timeout_seconds=8.0,
+            ),
+            charlotte_closures=TrafficProviderConfig.from_mapping(
+                data.get("charlotte_closures"),
+                default_interval_seconds=900.0,
+                min_interval_seconds=300.0,
+                default_timeout_seconds=8.0,
+            ),
+            external_waze_visual_enabled=bool(data.get("external_waze_visual_enabled", True)),
+            external_waze_zoom=zoom,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class WorldAwarenessConfig:
     enabled: bool = False
     location: AwarenessLocationConfig = field(default_factory=AwarenessLocationConfig)
@@ -256,6 +385,7 @@ class WorldAwarenessConfig:
     surface: AviationSurfaceConfig = field(default_factory=AviationSurfaceConfig)
     forecast: NWSForecastConfig = field(default_factory=NWSForecastConfig)
     radar: RadarConfig = field(default_factory=RadarConfig)
+    traffic: TrafficConfig = field(default_factory=TrafficConfig)
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "WorldAwarenessConfig":
@@ -272,6 +402,7 @@ class WorldAwarenessConfig:
             surface=AviationSurfaceConfig.from_mapping(data.get("surface")),
             forecast=NWSForecastConfig.from_mapping(data.get("forecast")),
             radar=RadarConfig.from_mapping(data.get("radar")),
+            traffic=TrafficConfig.from_mapping(data.get("traffic")),
         )
 
 

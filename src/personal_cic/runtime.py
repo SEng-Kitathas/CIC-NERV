@@ -11,6 +11,7 @@ from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted, Run
 from personal_cic.core.events import utc_now_iso
 from personal_cic.presentation import PresentationServer
 from personal_cic.world_awareness import WorldAwarenessWorker
+from personal_cic.traffic_awareness import TrafficAwarenessWorker
 
 
 class PersistentRuntime:
@@ -34,6 +35,7 @@ class PersistentRuntime:
         self._runtime_started_at: str | None = None
         self.presentation: PresentationServer | None = None
         self.world_awareness: WorldAwarenessWorker | None = None
+        self.traffic_awareness: TrafficAwarenessWorker | None = None
         if self.runtime_config.presentation.enabled:
             self.presentation = PresentationServer(
                 world=self.context.world,
@@ -48,6 +50,16 @@ class PersistentRuntime:
                 context=self.context,
                 config=self.runtime_config.world_awareness,
             )
+            traffic = self.runtime_config.world_awareness.traffic
+            if traffic.enabled:
+                location = self.runtime_config.world_awareness.location
+                self.traffic_awareness = TrafficAwarenessWorker(
+                    context=self.context,
+                    config=traffic,
+                    location_label=location.label,
+                    latitude=location.latitude,
+                    longitude=location.longitude,
+                )
 
     def request_stop(self, reason: str) -> None:
         self.stop_reason = reason
@@ -87,12 +99,16 @@ class PersistentRuntime:
         # authority before fresh provider observation has been attempted.
         if self.world_awareness is not None:
             self.world_awareness.prepare_reentry()
+        if self.traffic_awareness is not None:
+            self.traffic_awareness.prepare_reentry()
 
         try:
             if self.presentation is not None:
                 self.presentation.start()
             if self.world_awareness is not None:
                 self.world_awareness.start()
+            if self.traffic_awareness is not None:
+                self.traffic_awareness.start()
 
             while not self.stop_event.is_set():
                 cycle_started = time.monotonic()
@@ -106,6 +122,8 @@ class PersistentRuntime:
                 )
                 self.stop_event.wait(wait_for)
         finally:
+            if self.traffic_awareness is not None:
+                self.traffic_awareness.stop()
             if self.world_awareness is not None:
                 self.world_awareness.stop()
             if self.presentation is not None:

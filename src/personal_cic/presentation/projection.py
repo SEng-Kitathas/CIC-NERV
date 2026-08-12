@@ -398,3 +398,174 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
         },
         "feed": list(feed or []),
     }
+
+
+def build_traffic_projection(world: WorldState) -> dict[str, Any]:
+    """Project source-preserving local traffic state for an operator map.
+
+    The projection deliberately keeps each provider observation separate. Event
+    kernels are a derived convenience layer and never replace their source records.
+    """
+
+    snapshot = world.snapshot()
+    entities = snapshot.get("entities", {})
+
+    def entity_component(entity_id: str, component_name: str) -> dict[str, Any]:
+        return _component(entities.get(entity_id, {}), component_name) or {}
+
+    def obs(entity_id: str) -> dict[str, Any]:
+        value = entity_component(entity_id, "ObservationState")
+        return {
+            "availability": value.get("availability", "unavailable"),
+            "adapter_id": value.get("adapter_id"),
+            "checked_at": value.get("checked_at"),
+            "last_success_at": value.get("last_success_at"),
+            "freshness_seconds": _freshness_seconds(value.get("checked_at")),
+            "last_success_age_seconds": _freshness_seconds(value.get("last_success_at")),
+            "reasons": value.get("reasons", []),
+        }
+
+    source_entities = {
+        "drivenc_events": "local-traffic-drivenc-events",
+        "wzdx": "local-traffic-wzdx",
+        "cmpd": "local-traffic-cmpd-cad",
+        "charlotte_closures": "local-traffic-charlotte-closures",
+        "cameras": "local-traffic-drivenc-cameras",
+        "message_signs": "local-traffic-drivenc-signs",
+    }
+
+    event_sources: dict[str, dict[str, Any]] = {}
+    flat_events: list[dict[str, Any]] = []
+    for key in ("drivenc_events", "wzdx", "cmpd", "charlotte_closures"):
+        entity_id = source_entities[key]
+        state = entity_component(entity_id, "TrafficEventCollectionState")
+        observation = obs(entity_id)
+        usable = observation["availability"] in ("current", "degraded")
+        event_sources[key] = {
+            **state,
+            "authoritative_now": usable,
+            "observation": observation,
+        }
+        for event in state.get("events") or []:
+            if not isinstance(event, dict):
+                continue
+            flat_events.append(
+                {
+                    **event,
+                    "source_key": key,
+                    "source_authoritative_now": usable,
+                    "source_availability": observation["availability"],
+                }
+            )
+
+    cameras_state = entity_component(source_entities["cameras"], "TrafficCameraCollectionState")
+    cameras_obs = obs(source_entities["cameras"])
+    cameras_usable = cameras_obs["availability"] in ("current", "degraded")
+    cameras = {
+        **cameras_state,
+        "authoritative_now": cameras_usable,
+        "observation": cameras_obs,
+    }
+
+    signs_state = entity_component(source_entities["message_signs"], "TrafficMessageSignCollectionState")
+    signs_obs = obs(source_entities["message_signs"])
+    signs_usable = signs_obs["availability"] in ("current", "degraded")
+    signs = {
+        **signs_state,
+        "authoritative_now": signs_usable,
+        "observation": signs_obs,
+    }
+
+    situation_entity = "local-traffic-situation"
+    situation = entity_component(situation_entity, "TrafficSituationState")
+    situation_obs = obs(situation_entity)
+
+    radar_context_entity = entities.get("local-weather-radar-context", {})
+    radar_context = _component(radar_context_entity, "RadarContextState") or {}
+    radar_context_obs = _component(radar_context_entity, "ObservationState") or {}
+    context_sha = radar_context.get("context_sha256")
+
+    center_lat = situation.get("scope_center_latitude")
+    center_lon = situation.get("scope_center_longitude")
+    waze_url = None
+    if (
+        situation.get("external_waze_visual_enabled")
+        and isinstance(center_lat, (int, float))
+        and isinstance(center_lon, (int, float))
+    ):
+        zoom = int(situation.get("external_waze_zoom") or 11)
+        waze_url = (
+            "https://embed.waze.com/iframe?zoom="
+            + str(zoom)
+            + "&lat="
+            + str(center_lat)
+            + "&lon="
+            + str(center_lon)
+        )
+
+    return {
+        "api_version": 1,
+        "presentation": {
+            "mode": "read-only",
+            "generated_at": _now_iso(),
+            "world_schema_version": snapshot.get("schema_version"),
+        },
+        "location": {
+            "label": situation.get("location_label") or "configured local area",
+            "latitude": center_lat,
+            "longitude": center_lon,
+            "radius_miles": situation.get("scope_radius_miles"),
+        },
+        "summary": {
+            "availability": situation_obs["availability"],
+            "event_kernels": situation.get("event_kernel_count"),
+            "source_observations": situation.get("source_observation_count"),
+            "full_closures": situation.get("full_closure_count"),
+            "cameras": situation.get("camera_count"),
+            "active_message_signs": situation.get("active_message_sign_count"),
+            "source_families": situation.get("current_source_families", []),
+            "correlation_mode": situation.get("correlation_mode"),
+            "collection_gaps": situation.get("collection_gaps", []),
+            "observation": situation_obs,
+        },
+        "event_sources": event_sources,
+        "events": flat_events,
+        "kernels": situation.get("kernels", []),
+        "cameras": cameras,
+        "message_signs": signs,
+        "map_context": {
+            **radar_context,
+            "displayable_now": bool(context_sha),
+            "context_state": (
+                "CURRENT"
+                if context_sha and radar_context_obs.get("availability") == "current"
+                else "DEGRADED"
+                if context_sha and radar_context_obs.get("availability") == "degraded"
+                else "LAST KNOWN"
+                if context_sha
+                else "UNAVAILABLE"
+            ),
+            "context_url": None if not context_sha else "/radar/context.json?sha=" + str(context_sha),
+            "observation": {
+                "availability": radar_context_obs.get("availability", "unavailable"),
+                "adapter_id": radar_context_obs.get("adapter_id"),
+                "checked_at": radar_context_obs.get("checked_at"),
+                "last_success_at": radar_context_obs.get("last_success_at"),
+                "freshness_seconds": _freshness_seconds(radar_context_obs.get("checked_at")),
+                "last_success_age_seconds": _freshness_seconds(radar_context_obs.get("last_success_at")),
+                "reasons": radar_context_obs.get("reasons", []),
+            },
+        },
+        "external_visual_sources": {
+            "waze": {
+                "enabled": bool(waze_url),
+                "mode": "operator_opt_in_browser_direct",
+                "canonical_worldstate": False,
+                "url": waze_url,
+                "disclosure": (
+                    "Waze Live Map is an external browser-direct visual source. "
+                    "Its crowd reports are not normalized into CIC WorldState in RC1."
+                ),
+            }
+        },
+    }

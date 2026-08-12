@@ -9,7 +9,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from personal_cic.core.world import WorldState
 from .pages import SYSTEMS_HTML, WORLD_HTML
-from .projection import build_systems_projection, build_world_projection
+from .traffic_page import TRAFFIC_HTML
+from .projection import build_systems_projection, build_traffic_projection, build_world_projection
 from .weather_feed import build_weather_feed
 
 
@@ -38,6 +39,7 @@ def _handler_factory(
                 "Content-Security-Policy",
                 "default-src 'self'; script-src 'self' 'unsafe-inline'; "
                 "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+                "frame-src https://embed.waze.com; "
                 "img-src 'self' data:; frame-ancestors 'none';",
             )
             if length:
@@ -124,6 +126,11 @@ def _handler_factory(
                 self._headers(200, "text/html; charset=utf-8", len(payload))
                 self.wfile.write(payload)
                 return
+            if path == "/traffic":
+                payload = TRAFFIC_HTML.encode("utf-8")
+                self._headers(200, "text/html; charset=utf-8", len(payload))
+                self.wfile.write(payload)
+                return
             if path == "/api/v1/systems":
                 metadata = runtime_metadata()
                 self._send_json(
@@ -136,6 +143,9 @@ def _handler_factory(
                 return
             if path == "/api/v1/world":
                 self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
+                return
+            if path == "/api/v1/traffic":
+                self._send_json(build_traffic_projection(world))
                 return
             if path == "/radar/latest.png":
                 self._send_cached_png(Path("latest.png"), (query.get("sha") or [None])[0])
@@ -164,9 +174,9 @@ def _handler_factory(
             parsed = urlsplit(self.path)
             path = parsed.path
             query = parse_qs(parsed.query)
-            if path in ("/", "/systems", "/world"):
+            if path in ("/", "/systems", "/world", "/traffic"):
                 self._headers(200, "text/html; charset=utf-8")
-            elif path in ("/api/v1/systems", "/api/v1/world"):
+            elif path in ("/api/v1/systems", "/api/v1/world", "/api/v1/traffic"):
                 self._headers(200, "application/json; charset=utf-8")
             elif path in ("/radar/latest.png", "/radar/warnings.png", "/radar/legend.png"):
                 filename = {

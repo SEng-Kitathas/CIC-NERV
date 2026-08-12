@@ -161,3 +161,7 @@ The World surface adds a subdued locally cached TIGERweb reference overlay and a
 ### 0.3.5 Surface Freshness Resilience
 
 Transient AviationWeather transport failure no longer forces an immediate switch away from still-fresh METAR evidence. The surface observation becomes explicitly DEGRADED while the last-known report remains inside its configured age window; fusion stays METAR-backed. Re-entry still requires fresh post-restart success, and genuine report staleness still withdraws authority.
+
+### 0.3.6 RC1 — Multi-source traffic substrate
+
+The read-only Traffic surface is available at `http://127.0.0.1:8765/traffic` with JSON at `GET /api/v1/traffic`. RC1 collects source-preserving official/local roadway evidence from DriveNC events, WZDx, CMPD traffic CAD, Charlotte street closures, DriveNC cameras, and message signs. It performs only exact same-lineage/upstream-ID event association and exposes collection gaps rather than manufacturing confidence or silently merging sources. The optional Waze Live Map is operator-triggered external visual evidence and is not canonical WorldState. See `docs/TRAFFIC.md`.

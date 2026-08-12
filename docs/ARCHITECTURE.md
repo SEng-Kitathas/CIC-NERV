@@ -150,3 +150,13 @@ Radar remains a typed current-world observation while recent image frames and ma
 ## 0.3.5 remote surface freshness resilience
 
 A failed retrieval attempt and invalid domain evidence are distinct facts. For AviationWeather METAR, a failed request may produce a DEGRADED retained observation only after this runtime epoch has already earned a fresh METAR success and only while the report timestamp remains inside the configured source-age policy. Re-entry still withdraws authority and retention cannot re-authorize persisted state before fresh post-restart observation. Once report age exceeds policy, the surface observation becomes UNAVAILABLE and fusion may fall back to a model source.
+
+## 0.3.6 RC1 traffic collection / correlation boundary
+
+Traffic is the first external domain intentionally composed from several collection lineages rather than several providers answering the same scalar question. Each source retains its own observation authority and record identity. A `TrafficSituationState` may derive event kernels, coverage families, and collection gaps, but those derived records never replace the source collections.
+
+RC1 permits only one event-equivalence rule: same source family plus the same upstream event identifier. This allows DriveNC Events and WZDx representations of one ATMSERS road event to share a kernel without being counted as independent confirmation. Cross-lineage event correlation remains deferred until spatial/temporal/road/direction/event-class evidence earns it.
+
+Traffic reuses the established Observation Integrity and re-entry laws. A successful empty source is current negative evidence; retrieval or schema failure is unavailable observation; persisted traffic values remain historical through restart until fresh source success re-earns authority. Traffic has no inherited METAR-style retained-authority policy.
+
+The `/traffic` browser remains a read-only WorldState projection. TIGERweb radar-context geometry may be reused as separately sourced reference context, but it acquires no traffic authority. Waze Live Map is an explicit exception only as operator-triggered external visual evidence: browser direct, noncanonical, and never counted as normalized corroboration in RC1.

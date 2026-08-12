@@ -31,6 +31,15 @@ from .components import (
     RadarMosaicState,
     RadarFrameReference,
     RadarContextState,
+    GeoPoint,
+    TrafficEventObservation,
+    TrafficEventCollectionState,
+    TrafficCameraObservation,
+    TrafficCameraCollectionState,
+    TrafficMessageSignObservation,
+    TrafficMessageSignCollectionState,
+    TrafficEventKernel,
+    TrafficSituationState,
 )
 
 
@@ -59,6 +68,10 @@ COMPONENT_TYPES = {
         CurrentWeatherEstimateState,
         RadarMosaicState,
         RadarContextState,
+        TrafficEventCollectionState,
+        TrafficCameraCollectionState,
+        TrafficMessageSignCollectionState,
+        TrafficSituationState,
     )
 }
 
@@ -127,6 +140,46 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
             if isinstance(item, dict)
         )
         values.setdefault("loop_frame_capacity", 15)
+    elif component_type is TrafficEventCollectionState:
+        events = []
+        for item in values.get("events", []):
+            if not isinstance(item, dict):
+                continue
+            event_values = dict(item)
+            event_values["geometry"] = tuple(
+                GeoPoint(**point)
+                for point in event_values.get("geometry", [])
+                if isinstance(point, dict)
+            )
+            events.append(TrafficEventObservation(**event_values))
+        values["events"] = tuple(events)
+    elif component_type is TrafficCameraCollectionState:
+        values["cameras"] = tuple(
+            TrafficCameraObservation(**item)
+            for item in values.get("cameras", [])
+            if isinstance(item, dict)
+        )
+    elif component_type is TrafficMessageSignCollectionState:
+        signs = []
+        for item in values.get("signs", []):
+            if not isinstance(item, dict):
+                continue
+            sign_values = dict(item)
+            sign_values["messages"] = tuple(sign_values.get("messages", []))
+            signs.append(TrafficMessageSignObservation(**sign_values))
+        values["signs"] = tuple(signs)
+    elif component_type is TrafficSituationState:
+        values["current_source_families"] = tuple(values.get("current_source_families", []))
+        values["collection_gaps"] = tuple(values.get("collection_gaps", []))
+        kernels = []
+        for item in values.get("kernels", []):
+            if not isinstance(item, dict):
+                continue
+            kernel_values = dict(item)
+            kernel_values["source_families"] = tuple(kernel_values.get("source_families", []))
+            kernel_values["source_record_refs"] = tuple(kernel_values.get("source_record_refs", []))
+            kernels.append(TrafficEventKernel(**kernel_values))
+        values["kernels"] = tuple(kernels)
     elif component_type is ObservationState:
         values["availability"] = ObservationAvailability(values["availability"])
         if isinstance(values.get("reasons"), list):

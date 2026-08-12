@@ -1,3 +1,19 @@
+## 0.3.6 RC1 — Slice 003f Multi-Source Traffic Substrate
+
+- Adds source-preserving traffic collection for DriveNC events, DriveNC WZDx work zones, CMPD live traffic CAD, Charlotte street closures, DriveNC cameras, and DriveNC message signs.
+- Uses the current city-operated CDOT StreetClosuresAndDetours MapServer for Charlotte closures and normalizes ArcGIS epoch-millisecond dates; the stale ArcGIS Online FeatureServer pointer is not treated as current authority.
+- Uses physical geometry/radius for locality instead of keyword matching; county scope is only a fallback when a DriveNC event has no usable geometry.
+- Treats HTTP success with an invalid provider schema as unavailable observation rather than valid empty traffic state.
+- Preserves fresh empty collections as explicit negative evidence.
+- Withdraws persisted traffic authority on re-entry and requires fresh post-restart collection.
+- Associates only proven same-lineage/same-upstream-ID records; DriveNC + WZDx representations of one ATMSERS event cannot become duplicate corroboration or duplicate closure counts.
+- Preserves separate camera and message-sign source families and valid `NO_MESSAGE` infrastructure state.
+- Adds source-aware materiality for traffic events, cameras, message signs, and derived event-kernel state.
+- Adds read-only `/traffic` and `/api/v1/traffic` with an interactive CIC-owned local map, source health, gaps, event detail, cameras, signs, and last-known toggling.
+- Adds an explicit operator-opt-in Waze Live Map visual seam that remains browser-direct external evidence and is not normalized into CIC WorldState.
+- Adds optional systemd secret-environment loading; DriveNC API credentials remain outside committed configuration and are redacted from provider failure detail.
+- RC1 does not claim completed Slice 003f: normalized Waze crowd telemetry, independent flow/ETA sources, CMPD geocoding, cross-lineage event association, and reference-route intelligence remain open.
+
 ## 0.3.5 — Slice 003e Surface Freshness Resilience
 
 - Add explicit retained-observation status for policy-bounded last-known data.

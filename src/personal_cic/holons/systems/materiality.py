@@ -19,6 +19,10 @@ from personal_cic.core.world.components import (
     CurrentWeatherEstimateState,
     RadarMosaicState,
     RadarContextState,
+    TrafficEventCollectionState,
+    TrafficCameraCollectionState,
+    TrafficMessageSignCollectionState,
+    TrafficSituationState,
 )
 
 
@@ -254,6 +258,82 @@ def telemetry_significance(
         old_semantic = (previous.method, previous.primary_source, previous.surface_station_count, previous.flight_category)
         new_semantic = (current.method, current.primary_source, current.surface_station_count, current.flight_category)
         return "material" if old_semantic != new_semantic else "sample"
+
+    if isinstance(current, TrafficEventCollectionState) and isinstance(previous, TrafficEventCollectionState):
+        def event_signature(state):
+            result = []
+            for event in state.events:
+                geometry = tuple(
+                    (round(point.latitude, 5), round(point.longitude, 5))
+                    for point in event.geometry
+                )
+                result.append((
+                    event.source_family,
+                    event.upstream_event_id or event.source_record_id,
+                    event.event_type,
+                    event.event_subtype,
+                    event.description,
+                    event.roadway,
+                    event.direction,
+                    event.severity,
+                    event.full_closure,
+                    event.lanes_affected,
+                    event.major_event,
+                    geometry,
+                ))
+            return (
+                state.provider,
+                state.source_family,
+                state.collection_class,
+                tuple(result),
+            )
+        return "material" if event_signature(previous) != event_signature(current) else "sample"
+
+    if isinstance(current, TrafficCameraCollectionState) and isinstance(previous, TrafficCameraCollectionState):
+        def camera_signature(state):
+            return tuple(
+                (
+                    camera.camera_id,
+                    camera.source_family,
+                    camera.status,
+                    camera.roadway,
+                    camera.direction,
+                    round(camera.latitude, 5),
+                    round(camera.longitude, 5),
+                    bool(camera.video_url),
+                )
+                for camera in state.cameras
+            )
+        return "material" if camera_signature(previous) != camera_signature(current) else "sample"
+
+    if isinstance(current, TrafficMessageSignCollectionState) and isinstance(previous, TrafficMessageSignCollectionState):
+        def sign_signature(state):
+            return tuple(
+                (sign.sign_id, sign.roadway, sign.direction, sign.messages)
+                for sign in state.signs
+            )
+        return "material" if sign_signature(previous) != sign_signature(current) else "sample"
+
+    if isinstance(current, TrafficSituationState) and isinstance(previous, TrafficSituationState):
+        old = (
+            previous.event_kernel_count,
+            previous.full_closure_count,
+            previous.camera_count,
+            previous.active_message_sign_count,
+            previous.current_source_families,
+            previous.collection_gaps,
+            tuple((kernel.kernel_id, kernel.source_families, kernel.source_record_refs) for kernel in previous.kernels),
+        )
+        new = (
+            current.event_kernel_count,
+            current.full_closure_count,
+            current.camera_count,
+            current.active_message_sign_count,
+            current.current_source_families,
+            current.collection_gaps,
+            tuple((kernel.kernel_id, kernel.source_families, kernel.source_record_refs) for kernel in current.kernels),
+        )
+        return "material" if old != new else "sample"
 
     if isinstance(current, WifiLinkState) and isinstance(previous, WifiLinkState):
         structural_old = (

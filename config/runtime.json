@@ -24,13 +24,13 @@
       "enabled": true,
       "interval_seconds": 60.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.5 (local personal system)"
+      "user_agent": "Personal-CIC/0.3.6 (local personal system)"
     },
     "surface": {
       "enabled": true,
       "interval_seconds": 60.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.5 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.6 (local personal system)",
       "station_ids": [
         "KEQY",
         "KCLT",
@@ -42,14 +42,14 @@
       "enabled": true,
       "interval_seconds": 300.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.5 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.6 (local personal system)",
       "points_refresh_seconds": 21600.0
     },
     "radar": {
       "enabled": true,
       "interval_seconds": 120.0,
       "timeout_seconds": 8.0,
-      "user_agent": "Personal-CIC/0.3.5 (local personal system)",
+      "user_agent": "Personal-CIC/0.3.6 (local personal system)",
       "range_miles": 75.0,
       "image_width": 900,
       "image_height": 600,
@@ -60,6 +60,39 @@
       "context_interval_seconds": 21600.0,
       "context_timeout_seconds": 8.0,
       "context_max_age_days": 30.0
+    },
+    "traffic": {
+      "enabled": true,
+      "radius_miles": 75.0,
+      "scope_counties": [
+        "Union",
+        "Mecklenburg"
+      ],
+      "drivenc": {
+        "enabled": true,
+        "events_interval_seconds": 60.0,
+        "cameras_interval_seconds": 1800.0,
+        "signs_interval_seconds": 60.0,
+        "timeout_seconds": 8.0,
+        "api_key_env": "DRIVENC_API_KEY"
+      },
+      "wzdx": {
+        "enabled": true,
+        "interval_seconds": 900.0,
+        "timeout_seconds": 30.0
+      },
+      "cmpd": {
+        "enabled": true,
+        "interval_seconds": 180.0,
+        "timeout_seconds": 8.0
+      },
+      "charlotte_closures": {
+        "enabled": true,
+        "interval_seconds": 900.0,
+        "timeout_seconds": 8.0
+      },
+      "external_waze_visual_enabled": true,
+      "external_waze_zoom": 11
     }
   }
 }

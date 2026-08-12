@@ -27,6 +27,7 @@ ExecStart=${RUNTIME} --config config/runtime.json --health-config config/health.
 Restart=on-failure
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-${HOME}/.config/personal-cic/secrets.env
 
 [Install]
 WantedBy=default.target

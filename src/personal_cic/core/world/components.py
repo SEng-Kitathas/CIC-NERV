@@ -292,3 +292,141 @@ class RadarContextState:
     primary_road_count: int
     secondary_road_count: int
     place_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class GeoPoint:
+    latitude: float
+    longitude: float
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficEventObservation:
+    source_record_id: str
+    source_family: str
+    provider: str
+    collection_class: str
+    event_type: str
+    event_subtype: str | None
+    description: str
+    roadway: str | None
+    direction: str | None
+    county: str | None
+    geometry: tuple[GeoPoint, ...] = ()
+    reported_at: str | None = None
+    updated_at: str | None = None
+    start_at: str | None = None
+    end_at: str | None = None
+    severity: str | None = None
+    full_closure: bool | None = None
+    lanes_affected: str | None = None
+    major_event: str | None = None
+    source_organization: str | None = None
+    source_id: str | None = None
+    upstream_event_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficEventCollectionState:
+    location_label: str
+    provider: str
+    source_family: str
+    collection_class: str
+    scope_center_latitude: float
+    scope_center_longitude: float
+    scope_radius_miles: float
+    source_record_count: int
+    local_record_count: int
+    freshest_source_at: str | None
+    events: tuple[TrafficEventObservation, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficCameraObservation:
+    camera_id: str
+    source_family: str
+    provider: str
+    source_id: str | None
+    county: str | None
+    roadway: str | None
+    direction: str | None
+    location: str | None
+    latitude: float
+    longitude: float
+    status: str | None
+    page_url: str | None
+    video_url: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficCameraCollectionState:
+    location_label: str
+    provider: str
+    source_family: str
+    scope_center_latitude: float
+    scope_center_longitude: float
+    scope_radius_miles: float
+    source_record_count: int
+    local_record_count: int
+    cameras: tuple[TrafficCameraObservation, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficMessageSignObservation:
+    sign_id: str
+    source_family: str
+    provider: str
+    county: str | None
+    roadway: str | None
+    direction: str | None
+    name: str | None
+    latitude: float
+    longitude: float
+    updated_at: str | None
+    messages: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficMessageSignCollectionState:
+    location_label: str
+    provider: str
+    source_family: str
+    scope_center_latitude: float
+    scope_center_longitude: float
+    scope_radius_miles: float
+    source_record_count: int
+    local_record_count: int
+    active_message_count: int
+    signs: tuple[TrafficMessageSignObservation, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficEventKernel:
+    kernel_id: str
+    roadway: str | None
+    summary: str
+    latitude: float | None
+    longitude: float | None
+    source_families: tuple[str, ...]
+    source_record_refs: tuple[str, ...]
+    association_basis: str
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficSituationState:
+    location_label: str
+    derived_at: str
+    scope_center_latitude: float
+    scope_center_longitude: float
+    scope_radius_miles: float
+    source_observation_count: int
+    event_kernel_count: int
+    full_closure_count: int
+    camera_count: int
+    active_message_sign_count: int
+    current_source_families: tuple[str, ...]
+    collection_gaps: tuple[str, ...]
+    correlation_mode: str
+    external_waze_visual_enabled: bool
+    external_waze_zoom: int
+    kernels: tuple[TrafficEventKernel, ...] = ()
