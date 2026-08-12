@@ -41,6 +41,7 @@ class PersistentRuntime:
                 port=self.runtime_config.presentation.port,
                 runtime_metadata=self._presentation_metadata,
                 event_journal_path=self.runtime_config.event_journal_path,
+                radar_cache_dir=self.runtime_config.world_awareness.radar.cache_dir,
             )
         if self.runtime_config.world_awareness.enabled:
             self.world_awareness = WorldAwarenessWorker(

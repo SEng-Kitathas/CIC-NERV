@@ -1,3 +1,4 @@
+from hashlib import sha256
 import json
 import unittest
 from urllib.error import HTTPError
@@ -25,6 +26,7 @@ from personal_cic.core.world.components import (
     NWSHourlyForecastState,
     SurfaceObservationNetworkState,
     SurfaceStationObservation,
+    RadarMosaicState,
 )
 from personal_cic.presentation import (
     PresentationServer,
@@ -213,6 +215,13 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("PERSONAL CIC // WORLD", body)
         self.assertIn("Open-Meteo", body)
         self.assertIn("CC BY 4.0", body)
+        self.assertIn("RADAR // MRMS BREF.QCD + NWS WARNINGS", body)
+        self.assertIn("MRMS STREAM AGE", body)
+        self.assertIn("id=\"radar-image\"", body)
+        self.assertIn("rd.image_url", body)
+        self.assertIn("id=\"radar-stage\"", body)
+        self.assertIn("rs.style.aspectRatio", body)
+        self.assertIn("rd.warning_overlay_current", body)
         with urlopen(f"http://127.0.0.1:{server.bound_port}/api/v1/world", timeout=2) as response:
             payload=json.loads(response.read())
         self.assertEqual(payload["presentation"]["mode"], "read-only")
@@ -235,7 +244,7 @@ class PresentationTests(unittest.TestCase):
         self.world.upsert_component("local-weather-estimate",estimate)
         self.world.upsert_component("local-weather-estimate",ObservationState("weather.fusion",ObservationAvailability.CURRENT,"2026-08-11T20:00:00+00:00","2026-08-11T20:00:00+00:00",()))
         projection=build_world_projection(self.world,feed=[{"category":"ALERT","title":"Test","detail":"x"}])
-        self.assertEqual(projection["api_version"],2)
+        self.assertEqual(projection["api_version"],3)
         self.assertEqual(projection["surface"]["selected_station_id"],"KEQY")
         self.assertEqual(projection["surface"]["wind_speed_median_mph"],10.0)
         self.assertEqual(projection["surface"]["wind_gust_max_mph"],15.0)
@@ -245,6 +254,131 @@ class PresentationTests(unittest.TestCase):
         self.assertTrue(projection["estimate"]["current_now"])
         self.assertNotIn("authoritative_now", projection["estimate"])
         self.assertEqual(projection["feed"][0]["category"],"ALERT")
+
+    def test_world_projection_exposes_radar_metadata_and_local_image_routes(self):
+        self.world.ensure_entity("local-weather-radar", "Radar")
+        state = RadarMosaicState(
+            location_label="Test",
+            provider="NOAA/NWS MRMS + NWS GeoServer",
+            product="BREF.QCD",
+            layer="conus_bref_qcd",
+            stream_latest_filename="CONUS_L2_BREF_QCD_20260812_010400.tif.gz",
+            stream_latest_at="2026-08-12T01:04:00+00:00",
+            frame_retrieved_at="2026-08-12T01:04:05+00:00",
+            west=-82.0,
+            south=34.0,
+            east=-79.0,
+            north=36.0,
+            range_miles=75.0,
+            image_width=900,
+            image_height=600,
+            image_sha256="abc123",
+            warning_overlay_available=True,
+            warning_image_sha256="warn123",
+            legend_available=True,
+            legend_image_sha256="legend123",
+        )
+        self.world.upsert_component("local-weather-radar", state)
+        self.world.upsert_component(
+            "local-weather-radar",
+            ObservationState(
+                "nws.mrms.radar",
+                ObservationAvailability.CURRENT,
+                "2026-08-12T01:05:00+00:00",
+                "2026-08-12T01:05:00+00:00",
+                (),
+            ),
+        )
+        projection = build_world_projection(self.world)
+        radar = projection["radar"]
+        self.assertTrue(radar["current_now"])
+        self.assertTrue(radar["displayable_now"])
+        self.assertIn("/radar/latest.png?sha=abc123", radar["image_url"])
+        self.assertIn("/radar/warnings.png?sha=warn123", radar["warning_image_url"])
+        self.assertNotIn("http", radar["image_url"])
+
+    def test_unavailable_radar_keeps_last_known_frame_but_never_current_warning_overlay(self):
+        self.world.ensure_entity("local-weather-radar", "Radar")
+        state = RadarMosaicState(
+            location_label="Test",
+            provider="NOAA/NWS MRMS + NWS GeoServer",
+            product="BREF.QCD",
+            layer="conus_bref_qcd",
+            stream_latest_filename="CONUS_L2_BREF_QCD_20260812_010400.tif.gz",
+            stream_latest_at="2026-08-12T01:04:00+00:00",
+            frame_retrieved_at="2026-08-12T01:04:05+00:00",
+            west=-82.0,
+            south=34.0,
+            east=-79.0,
+            north=36.0,
+            range_miles=75.0,
+            image_width=900,
+            image_height=600,
+            image_sha256="abc123",
+            warning_overlay_available=True,
+            warning_image_sha256="warn123",
+            legend_available=True,
+            legend_image_sha256="legend123",
+        )
+        self.world.upsert_component("local-weather-radar", state)
+        self.world.upsert_component(
+            "local-weather-radar",
+            ObservationState(
+                "nws.mrms.radar",
+                ObservationAvailability.UNAVAILABLE,
+                "2026-08-12T01:06:00+00:00",
+                "2026-08-12T01:05:00+00:00",
+                ("provider unavailable",),
+            ),
+        )
+        radar = build_world_projection(self.world)["radar"]
+        self.assertEqual(radar["frame_state"], "LAST KNOWN")
+        self.assertFalse(radar["warning_overlay_current"])
+        self.assertEqual(radar["warning_overlay_state"], "LAST KNOWN")
+        self.assertIsNotNone(radar["image_url"])
+        self.assertIsNone(radar["warning_image_url"])
+
+    def test_http_server_serves_only_fixed_cached_radar_images(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            radar = b"\x89PNG\r\n\x1a\nradar"
+            warnings = b"\x89PNG\r\n\x1a\nwarn"
+            (cache / "latest.png").write_bytes(radar)
+            (cache / "warnings.png").write_bytes(warnings)
+
+            server = PresentationServer(
+                world=self.world,
+                host="127.0.0.1",
+                port=0,
+                runtime_metadata=lambda: {},
+                radar_cache_dir=cache,
+            )
+            server.start()
+            self.addCleanup(server.stop)
+
+            with urlopen(
+                f"http://127.0.0.1:{server.bound_port}/radar/latest.png?sha={sha256(radar).hexdigest()}",
+                timeout=2,
+            ) as response:
+                self.assertEqual(response.read(), radar)
+                self.assertEqual(response.headers.get_content_type(), "image/png")
+
+            with self.assertRaises(HTTPError) as mismatch:
+                urlopen(
+                    f"http://127.0.0.1:{server.bound_port}/radar/latest.png?sha={'0' * 64}",
+                    timeout=2,
+                )
+            self.assertEqual(mismatch.exception.code, 409)
+
+            with self.assertRaises(HTTPError) as captured:
+                urlopen(
+                    f"http://127.0.0.1:{server.bound_port}/radar/not-allowed.png",
+                    timeout=2,
+                )
+            self.assertEqual(captured.exception.code, 404)
 
     def test_world_page_does_not_interpolate_provider_strings_through_inner_html(self):
         server = PresentationServer(

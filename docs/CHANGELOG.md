@@ -113,3 +113,10 @@
 - Stop journaling transient missing signal fields as durable Wi-Fi domain changes.
 - Treat normal frequency/channel roaming as live radio telemetry rather than durable operational history.
 - Preserve link/disconnect, SSID, interface, and IP structural transitions as material.
+
+## 0.3.3
+- Clarify radar provenance: the RIDGEII latest-product timestamp is a source-stream freshness witness, while the WMS raster has independent retrieval-time/hash identity; no false GeoTIFF↔WMS frame binding is asserted.
+- Ignore runtime-owned `state/radar/` cache artifacts so live collection cannot dirty Git checkpoints.
+
+- Add NOAA/NWS MRMS BREF.QCD local radar mosaic and NWS warning overlay.
+- Add radar source-age metadata, re-entry withdrawal, sample-vs-material frame semantics, and loopback cached image endpoints.

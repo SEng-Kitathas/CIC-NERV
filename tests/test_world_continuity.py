@@ -112,6 +112,96 @@ class WorldContinuityTests(unittest.TestCase):
         self.assertEqual(restored.get_component("surface", SurfaceObservationNetworkState),surface)
         self.assertEqual(restored.get_component("surface", NWSHourlyForecastState),forecast)
 
+    def test_radar_mosaic_round_trip(self):
+        from personal_cic.core.world.components import RadarMosaicState
+
+        state = RadarMosaicState(
+            location_label="Test",
+            provider="NOAA/NWS MRMS + NWS GeoServer",
+            product="BREF.QCD",
+            layer="conus_bref_qcd",
+            stream_latest_filename="CONUS_L2_BREF_QCD_20260812_010400.tif.gz",
+            stream_latest_at="2026-08-12T01:04:00+00:00",
+            frame_retrieved_at="2026-08-12T01:04:05+00:00",
+            west=-82.0,
+            south=34.0,
+            east=-79.0,
+            north=36.0,
+            range_miles=75.0,
+            image_width=900,
+            image_height=600,
+            image_sha256="abc",
+            warning_overlay_available=True,
+            warning_image_sha256="def",
+            legend_available=True,
+            legend_image_sha256="ghi",
+        )
+        world = WorldState(EventBus())
+        world.ensure_entity("local-weather-radar", "Radar")
+        world.upsert_component("local-weather-radar", state)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "world.json"
+            world.write_json(path)
+            restored = WorldState(EventBus())
+            count = restored.hydrate_json(path)
+        self.assertEqual(count, 1)
+        self.assertEqual(
+            restored.get_component("local-weather-radar", RadarMosaicState),
+            state,
+        )
+
+    def test_radar_rc1_snapshot_migrates_without_false_frame_binding(self):
+        from personal_cic.core.world.components import RadarMosaicState
+        import json
+
+        payload = {
+            "schema_version": 3,
+            "entities": {
+                "local-weather-radar": {
+                    "label": "Local Radar",
+                    "components": {
+                        "RadarMosaicState": {
+                            "location_label": "Test",
+                            "provider": "NOAA/NWS MRMS + NWS GeoServer",
+                            "product": "BREF.QCD",
+                            "layer": "conus_bref_qcd",
+                            "source_filename": "CONUS_L2_BREF_QCD_20260812_010400.tif.gz",
+                            "source_product_at": "2026-08-12T01:04:00+00:00",
+                            "west": -82.0,
+                            "south": 34.0,
+                            "east": -79.0,
+                            "north": 36.0,
+                            "range_miles": 75.0,
+                            "image_width": 900,
+                            "image_height": 600,
+                            "image_sha256": "abc",
+                            "warning_overlay_available": True,
+                            "warning_image_sha256": "def",
+                            "legend_available": True,
+                            "legend_image_sha256": "ghi",
+                        }
+                    },
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "world.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            world = WorldState(EventBus())
+            restored = world.hydrate_json(path)
+
+        self.assertEqual(restored, 1)
+        state = world.get_component("local-weather-radar", RadarMosaicState)
+        self.assertEqual(
+            state.stream_latest_filename,
+            "CONUS_L2_BREF_QCD_20260812_010400.tif.gz",
+        )
+        self.assertEqual(state.stream_latest_at, "2026-08-12T01:04:00+00:00")
+        # RC1 never recorded the separately retrieved WMS frame time, so the
+        # migration must not invent one from the RIDGEII stream timestamp.
+        self.assertIsNone(state.frame_retrieved_at)
+
     def test_rc1_estimate_snapshot_field_names_migrate_on_hydration(self):
         from personal_cic.core.world.components import CurrentWeatherEstimateState
         payload = {

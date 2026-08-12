@@ -28,6 +28,7 @@ from .components import (
     NWSForecastHour,
     NWSHourlyForecastState,
     CurrentWeatherEstimateState,
+    RadarMosaicState,
 )
 
 
@@ -54,6 +55,7 @@ COMPONENT_TYPES = {
         SurfaceObservationNetworkState,
         NWSHourlyForecastState,
         CurrentWeatherEstimateState,
+        RadarMosaicState,
     )
 }
 
@@ -107,6 +109,15 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
         for old_name, new_name in legacy:
             if new_name not in values and old_name in values:
                 values[new_name] = values.pop(old_name)
+    elif component_type is RadarMosaicState:
+        # 0.3.3 RC1 used names that could imply the separately retrieved WMS
+        # frame was bound to a specific RIDGEII GeoTIFF. Preserve the useful
+        # source-stream freshness witness without manufacturing that binding.
+        if "stream_latest_filename" not in values and "source_filename" in values:
+            values["stream_latest_filename"] = values.pop("source_filename")
+        if "stream_latest_at" not in values and "source_product_at" in values:
+            values["stream_latest_at"] = values.pop("source_product_at")
+        values.setdefault("frame_retrieved_at", None)
     elif component_type is ObservationState:
         values["availability"] = ObservationAvailability(values["availability"])
         if isinstance(values.get("reasons"), list):

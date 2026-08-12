@@ -50,3 +50,7 @@ A residual becomes P0 only when it creates a demonstrated correctness, authority
 - **Re-entry:** restored remote freshness is withdrawn for every new provider/derived estimate before presentation.
 - **Materiality:** provider polling does not itself create feed/history; the WX feed reads material journal facts.
 - **Native substrate:** AviationWeather and NWS linked-data endpoints are consumed through narrow typed adapters.
+
+### Radar semantic home
+
+Radar metadata authority lives in `RadarMosaicState`; raw image bytes remain adapter cache artifacts and do not become competing WorldState truth. Provider failure withdraws observation authority without inventing a new radar domain value.

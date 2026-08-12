@@ -242,3 +242,26 @@ class CurrentWeatherEstimateState:
     nws_reference_temperature_f: float | None
     nws_reference_delta_f: float | None
     nws_reference_start: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RadarMosaicState:
+    location_label: str
+    provider: str
+    product: str
+    layer: str
+    stream_latest_filename: str
+    stream_latest_at: str
+    frame_retrieved_at: str | None
+    west: float
+    south: float
+    east: float
+    north: float
+    range_miles: float
+    image_width: int
+    image_height: int
+    image_sha256: str
+    warning_overlay_available: bool
+    warning_image_sha256: str | None
+    legend_available: bool
+    legend_image_sha256: str | None

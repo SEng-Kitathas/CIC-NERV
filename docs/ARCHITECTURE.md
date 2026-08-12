@@ -137,3 +137,7 @@ Remote weather and alert providers are observed on a slower dedicated runtime th
 ## 0.3.2 source-role weather architecture
 
 Weather sources are not interchangeable votes. METAR owns observed surface reports, NWS owns official forecast/alerts, and Open-Meteo remains model-derived context/fallback. Current-weather fusion preserves those roles and exposes disagreement. The WX feed is a read-only projection of material durable events, not a competing history store.
+
+## Radar image cache boundary
+
+Radar image bytes are adapter-owned cache artifacts under `state/radar/`; only typed radar metadata and observation authority enter WorldState. The presentation server serves those fixed cache files read-only over loopback.

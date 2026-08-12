@@ -21,6 +21,18 @@ class WeatherFeedTests(unittest.TestCase):
         self.assertEqual(feed[0]["category"],"ALERT")
         self.assertIn("activated",feed[0]["title"])
 
+    def test_radar_feed_names_warning_overlay_availability_change(self):
+        records=[
+            {"event_type":"ComponentUpdated","payload":{"entity_id":"local-weather-radar","component_name":"RadarMosaicState","previous":{"warning_overlay_available":True,"product":"BREF.QCD","range_miles":75},"current":{"warning_overlay_available":False,"product":"BREF.QCD","range_miles":75},"significance":"material","event_id":"r1","occurred_at":"t1"}},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"events.jsonl"
+            path.write_text("\n".join(json.dumps(r) for r in records)+"\n")
+            feed=build_weather_feed(path)
+        self.assertEqual(feed[0]["category"],"RADAR")
+        self.assertIn("warning-overlay availability",feed[0]["title"])
+        self.assertIn("true -> false",feed[0]["detail"])
+
     def test_feed_suppresses_expected_reentry_provider_lifecycle(self):
         records=[
             {"event_type":"ComponentUpdated","payload":{"entity_id":"local-weather-surface","component_name":"ObservationState","previous":{"availability":"current","reasons":[]},"current":{"availability":"unavailable","reasons":["reentry: awaiting fresh AviationWeather METAR observation"]},"significance":"material","event_id":"1","occurred_at":"t1"}},

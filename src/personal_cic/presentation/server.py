@@ -1,8 +1,10 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from hashlib import sha256
 from pathlib import Path
 import json
 from threading import Thread
 from typing import Callable
+from urllib.parse import parse_qs, urlsplit
 
 from personal_cic.core.world import WorldState
 from .pages import SYSTEMS_HTML, WORLD_HTML
@@ -15,7 +17,12 @@ class _CICHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
 
-def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict], event_journal_path: Path | None):
+def _handler_factory(
+    world: WorldState,
+    runtime_metadata: Callable[[], dict],
+    event_journal_path: Path | None,
+    radar_cache_dir: Path | None,
+):
     class Handler(BaseHTTPRequestHandler):
         server_version = "PersonalCIC/0.3"
 
@@ -41,18 +48,52 @@ def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict], ev
             self._headers(status, "application/json; charset=utf-8", len(body))
             self.wfile.write(body)
 
+        def _cached_png(self, filename: str, expected_sha: str | None):
+            if radar_cache_dir is None:
+                return None, "not_found", 404
+            if expected_sha is None or len(expected_sha) != 64:
+                return None, "invalid_frame_identity", 400
+            try:
+                int(expected_sha, 16)
+            except ValueError:
+                return None, "invalid_frame_identity", 400
+            path = radar_cache_dir / filename
+            if not path.exists() or not path.is_file():
+                return None, "not_found", 404
+            payload = path.read_bytes()
+            if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+                return None, "invalid_cached_image", 500
+            if sha256(payload).hexdigest() != expected_sha:
+                # WorldState metadata and adapter-owned cache must agree. A process
+                # crash between cache replacement and state/snapshot update may
+                # legitimately leave them out of sync; refuse to serve mismatched
+                # bytes rather than laundering them under an old frame identity.
+                return None, "frame_identity_mismatch", 409
+            return payload, None, 200
+
+        def _send_cached_png(self, filename: str, expected_sha: str | None):
+            payload, error, status = self._cached_png(filename, expected_sha)
+            if payload is None:
+                self._send_json({"error": error}, status)
+                return
+            self._headers(200, "image/png", len(payload))
+            self.wfile.write(payload)
+
         def do_GET(self):
-            if self.path in ("/", "/systems"):
+            parsed = urlsplit(self.path)
+            path = parsed.path
+            query = parse_qs(parsed.query)
+            if path in ("/", "/systems"):
                 payload = SYSTEMS_HTML.encode("utf-8")
                 self._headers(200, "text/html; charset=utf-8", len(payload))
                 self.wfile.write(payload)
                 return
-            if self.path == "/world":
+            if path == "/world":
                 payload = WORLD_HTML.encode("utf-8")
                 self._headers(200, "text/html; charset=utf-8", len(payload))
                 self.wfile.write(payload)
                 return
-            if self.path == "/api/v1/systems":
+            if path == "/api/v1/systems":
                 metadata = runtime_metadata()
                 self._send_json(
                     build_systems_projection(
@@ -62,19 +103,43 @@ def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict], ev
                     )
                 )
                 return
-            if self.path == "/api/v1/world":
+            if path == "/api/v1/world":
                 self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
                 return
-            if self.path == "/favicon.ico":
+            if path == "/radar/latest.png":
+                self._send_cached_png("latest.png", (query.get("sha") or [None])[0])
+                return
+            if path == "/radar/warnings.png":
+                self._send_cached_png("warnings.png", (query.get("sha") or [None])[0])
+                return
+            if path == "/radar/legend.png":
+                self._send_cached_png("legend.png", (query.get("sha") or [None])[0])
+                return
+            if path == "/favicon.ico":
                 self._headers(204, "image/x-icon")
                 return
             self._send_json({"error": "not_found"}, 404)
 
         def do_HEAD(self):
-            if self.path in ("/", "/systems", "/world"):
+            parsed = urlsplit(self.path)
+            path = parsed.path
+            query = parse_qs(parsed.query)
+            if path in ("/", "/systems", "/world"):
                 self._headers(200, "text/html; charset=utf-8")
-            elif self.path in ("/api/v1/systems", "/api/v1/world"):
+            elif path in ("/api/v1/systems", "/api/v1/world"):
                 self._headers(200, "application/json; charset=utf-8")
+            elif path in ("/radar/latest.png", "/radar/warnings.png", "/radar/legend.png"):
+                filename = {
+                    "/radar/latest.png": "latest.png",
+                    "/radar/warnings.png": "warnings.png",
+                    "/radar/legend.png": "legend.png",
+                }[path]
+                expected_sha = (query.get("sha") or [None])[0]
+                payload, _error, status = self._cached_png(filename, expected_sha)
+                if payload is not None:
+                    self._headers(200, "image/png", len(payload))
+                else:
+                    self._headers(status, "application/json; charset=utf-8")
             else:
                 self._headers(404, "application/json; charset=utf-8")
 
@@ -102,7 +167,16 @@ def _handler_factory(world: WorldState, runtime_metadata: Callable[[], dict], ev
 class PresentationServer:
     """Loopback-only, read-only projection server for CIC WorldState."""
 
-    def __init__(self, *, world: WorldState, host: str, port: int, runtime_metadata: Callable[[], dict], event_journal_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        world: WorldState,
+        host: str,
+        port: int,
+        runtime_metadata: Callable[[], dict],
+        event_journal_path: Path | None = None,
+        radar_cache_dir: Path | None = None,
+    ) -> None:
         if host != "127.0.0.1":
             raise ValueError("Presentation is intentionally loopback-only")
         self.world = world
@@ -110,6 +184,7 @@ class PresentationServer:
         self.port = port
         self.runtime_metadata = runtime_metadata
         self.event_journal_path = event_journal_path
+        self.radar_cache_dir = radar_cache_dir
         self._httpd: _CICHTTPServer | None = None
         self._thread: Thread | None = None
 
@@ -120,7 +195,15 @@ class PresentationServer:
     def start(self) -> None:
         if self._httpd is not None:
             return
-        self._httpd = _CICHTTPServer((self.host, self.port), _handler_factory(self.world, self.runtime_metadata, self.event_journal_path))
+        self._httpd = _CICHTTPServer(
+            (self.host, self.port),
+            _handler_factory(
+                self.world,
+                self.runtime_metadata,
+                self.event_journal_path,
+                self.radar_cache_dir,
+            ),
+        )
         self._thread = Thread(target=self._httpd.serve_forever, name="personal-cic-presentation", daemon=True)
         self._thread.start()
 

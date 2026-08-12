@@ -150,3 +150,5 @@ The World API remains read-only:
 ```text
 GET http://127.0.0.1:8765/api/v1/world
 ```
+
+- 0.3.3 adds local NOAA/NWS MRMS radar imagery with warning overlay, source age, and loopback-only cached image delivery.

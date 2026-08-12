@@ -88,7 +88,7 @@ class NWSAlertsConfig:
     enabled: bool = True
     interval_seconds: float = 60.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.3 (local personal system)"
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "NWSAlertsConfig":
@@ -119,7 +119,7 @@ class AviationSurfaceConfig:
     enabled: bool = True
     interval_seconds: float = 60.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.3 (local personal system)"
     station_ids: tuple[str, ...] = ("KEQY", "KCLT", "KJQF")
     max_age_minutes: float = 90.0
 
@@ -129,7 +129,7 @@ class AviationSurfaceConfig:
             return cls()
         interval = float(data.get("interval_seconds", 60.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.2 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.3 (local personal system)")).strip()
         raw_ids = data.get("station_ids", ["KEQY", "KCLT", "KJQF"])
         station_ids = tuple(str(item).strip().upper() for item in raw_ids if str(item).strip())
         max_age = float(data.get("max_age_minutes", 90.0))
@@ -151,7 +151,7 @@ class NWSForecastConfig:
     enabled: bool = True
     interval_seconds: float = 300.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.2 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.3 (local personal system)"
     points_refresh_seconds: float = 21600.0
 
     @classmethod
@@ -160,7 +160,7 @@ class NWSForecastConfig:
             return cls()
         interval = float(data.get("interval_seconds", 300.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.2 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.3 (local personal system)")).strip()
         refresh = float(data.get("points_refresh_seconds", 21600.0))
         if interval < 60.0:
             raise ValueError("NWS forecast interval_seconds must be >= 60 seconds")
@@ -174,6 +174,55 @@ class NWSForecastConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class RadarConfig:
+    enabled: bool = True
+    interval_seconds: float = 120.0
+    timeout_seconds: float = 8.0
+    user_agent: str = "Personal-CIC/0.3.3 (local personal system)"
+    range_miles: float = 75.0
+    image_width: int = 900
+    image_height: int = 600
+    max_age_minutes: float = 15.0
+    cache_dir: Path = Path("state/radar")
+
+    @classmethod
+    def from_mapping(cls, data: dict | None) -> "RadarConfig":
+        if not data:
+            return cls()
+        interval = float(data.get("interval_seconds", 120.0))
+        timeout = float(data.get("timeout_seconds", 8.0))
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.3 (local personal system)")).strip()
+        range_miles = float(data.get("range_miles", 75.0))
+        image_width = int(data.get("image_width", 900))
+        image_height = int(data.get("image_height", 600))
+        max_age = float(data.get("max_age_minutes", 15.0))
+        cache_dir = Path(data.get("cache_dir", "state/radar"))
+        if interval < 60.0:
+            raise ValueError("MRMS radar interval_seconds must be >= 60 seconds")
+        if timeout <= 0:
+            raise ValueError("MRMS radar timeout_seconds must be > 0")
+        if not user_agent:
+            raise ValueError("MRMS radar requires a non-empty User-Agent")
+        if not 10.0 <= range_miles <= 300.0:
+            raise ValueError("MRMS radar range_miles must be between 10 and 300")
+        if not 256 <= image_width <= 1600 or not 256 <= image_height <= 1200:
+            raise ValueError("MRMS radar image dimensions are outside supported bounds")
+        if max_age <= 0:
+            raise ValueError("MRMS radar max_age_minutes must be > 0")
+        return cls(
+            enabled=bool(data.get("enabled", True)),
+            interval_seconds=interval,
+            timeout_seconds=timeout,
+            user_agent=user_agent,
+            range_miles=range_miles,
+            image_width=image_width,
+            image_height=image_height,
+            max_age_minutes=max_age,
+            cache_dir=cache_dir,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class WorldAwarenessConfig:
     enabled: bool = False
     location: AwarenessLocationConfig = field(default_factory=AwarenessLocationConfig)
@@ -183,6 +232,7 @@ class WorldAwarenessConfig:
     alerts: NWSAlertsConfig = field(default_factory=NWSAlertsConfig)
     surface: AviationSurfaceConfig = field(default_factory=AviationSurfaceConfig)
     forecast: NWSForecastConfig = field(default_factory=NWSForecastConfig)
+    radar: RadarConfig = field(default_factory=RadarConfig)
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "WorldAwarenessConfig":
@@ -198,6 +248,7 @@ class WorldAwarenessConfig:
             alerts=NWSAlertsConfig.from_mapping(data.get("alerts")),
             surface=AviationSurfaceConfig.from_mapping(data.get("surface")),
             forecast=NWSForecastConfig.from_mapping(data.get("forecast")),
+            radar=RadarConfig.from_mapping(data.get("radar")),
         )
 
 

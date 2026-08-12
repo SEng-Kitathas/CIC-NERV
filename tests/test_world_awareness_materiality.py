@@ -2,7 +2,7 @@ import unittest
 
 from personal_cic.core.config import HealthThresholds
 from personal_cic.core.world.components import (
-    CurrentWeatherEstimateState, NWSForecastHour, NWSHourlyForecastState, SurfaceObservationNetworkState, SurfaceStationObservation, WeatherAlertState, WeatherForecastState, WeatherState,
+    CurrentWeatherEstimateState, NWSForecastHour, NWSHourlyForecastState, RadarMosaicState, SurfaceObservationNetworkState, SurfaceStationObservation, WeatherAlertState, WeatherForecastState, WeatherState,
 )
 from personal_cic.holons.systems.materiality import telemetry_significance
 
@@ -66,6 +66,47 @@ class WorldAwarenessMaterialityTests(unittest.TestCase):
         fallback=CurrentWeatherEstimateState("Test","t2","openmeteo_model_fallback","Open-Meteo",0,77.0,None,80.0,260.0,10.0,15.0,None,None,None,None,None,77.0,0.0,76.0,-1.0,"h")
         self.assertEqual(telemetry_significance(old,drift,THRESHOLDS),"sample")
         self.assertEqual(telemetry_significance(old,fallback,THRESHOLDS),"material")
+
+    def test_radar_frame_churn_is_sample_but_overlay_availability_change_is_material(self):
+        args = dict(
+            location_label="Test",
+            provider="NOAA/NWS MRMS + NWS GeoServer",
+            product="BREF.QCD",
+            layer="conus_bref_qcd",
+            stream_latest_filename="a.tif.gz",
+            stream_latest_at="2026-08-12T01:00:00+00:00",
+            frame_retrieved_at="2026-08-12T01:00:05+00:00",
+            west=-82.0,
+            south=34.0,
+            east=-79.0,
+            north=36.0,
+            range_miles=75.0,
+            image_width=900,
+            image_height=600,
+            image_sha256="aaa",
+            warning_overlay_available=True,
+            warning_image_sha256="www",
+            legend_available=True,
+            legend_image_sha256="lll",
+        )
+        old = RadarMosaicState(**args)
+        new_args = dict(args)
+        new_args.update(
+            stream_latest_filename="b.tif.gz",
+            stream_latest_at="2026-08-12T01:02:00+00:00",
+            frame_retrieved_at="2026-08-12T01:02:05+00:00",
+            image_sha256="bbb",
+            warning_image_sha256="www2",
+        )
+        frame = RadarMosaicState(**new_args)
+        degraded_args = dict(new_args)
+        degraded_args.update(
+            warning_overlay_available=False,
+            warning_image_sha256=None,
+        )
+        degraded = RadarMosaicState(**degraded_args)
+        self.assertEqual(telemetry_significance(old, frame, THRESHOLDS), "sample")
+        self.assertEqual(telemetry_significance(frame, degraded, THRESHOLDS), "material")
 
     def test_nws_forecast_window_roll_without_semantic_change_is_sample(self):
         old_h=NWSForecastHour("2026-08-11T20:00:00-04:00",80.0,70.0,70.0,12.0,3.0,3.0,"W","Mostly Clear")

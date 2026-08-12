@@ -85,16 +85,49 @@ class RuntimeConfigTests(unittest.TestCase):
 
         self.assertEqual(
             config.surface.user_agent,
-            "Personal-CIC/0.3.2 (local personal system)",
+            "Personal-CIC/0.3.3 (local personal system)",
         )
         self.assertEqual(
             config.forecast.user_agent,
-            "Personal-CIC/0.3.2 (local personal system)",
+            "Personal-CIC/0.3.3 (local personal system)",
         )
         self.assertEqual(
             config.alerts.user_agent,
-            "Personal-CIC/0.3.2 (local personal system)",
+            "Personal-CIC/0.3.3 (local personal system)",
         )
+        self.assertEqual(
+            config.radar.user_agent,
+            "Personal-CIC/0.3.3 (local personal system)",
+        )
+
+    def test_world_awareness_radar_config(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        config = WorldAwarenessConfig.from_mapping(
+            {
+                "enabled": True,
+                "radar": {
+                    "interval_seconds": 120,
+                    "range_miles": 90,
+                    "image_width": 1000,
+                    "image_height": 700,
+                    "cache_dir": "state/test-radar",
+                },
+            }
+        )
+        self.assertEqual(config.radar.interval_seconds, 120.0)
+        self.assertEqual(config.radar.range_miles, 90.0)
+        self.assertEqual(config.radar.image_width, 1000)
+        self.assertEqual(config.radar.cache_dir, Path("state/test-radar"))
+
+    def test_world_awareness_rejects_too_fast_radar_refresh(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        with self.assertRaises(ValueError):
+            WorldAwarenessConfig.from_mapping(
+                {"enabled": True, "radar": {"interval_seconds": 30}}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

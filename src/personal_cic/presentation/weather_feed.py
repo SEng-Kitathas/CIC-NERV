@@ -9,6 +9,7 @@ _WEATHER_ENTITIES = {
     "local-weather-surface",
     "local-weather-nws-forecast",
     "local-weather-estimate",
+    "local-weather-radar",
 }
 
 
@@ -51,6 +52,22 @@ def _item(record: dict) -> dict | None:
         category = "FUSION"
         title = "Current-weather estimate source changed"
         detail = f"{current.get('method') or '--'} // {current.get('primary_source') or '--'}"
+    elif name == "RadarMosaicState":
+        category = "RADAR"
+        old_overlay = previous.get("warning_overlay_available")
+        new_overlay = current.get("warning_overlay_available")
+        if old_overlay != new_overlay:
+            title = "Radar warning-overlay availability changed"
+            detail = (
+                f"{str(old_overlay).lower()} -> {str(new_overlay).lower()}"
+                f" // {current.get('product') or '--'}"
+            )
+        else:
+            title = "Radar product configuration changed"
+            detail = (
+                f"{current.get('product') or '--'}"
+                f" // {current.get('range_miles') or '--'} mi ring range"
+            )
     elif name == "ObservationState":
         previous_reasons = [str(x) for x in (previous.get("reasons") or [])]
         current_reasons = [str(x) for x in (current.get("reasons") or [])]

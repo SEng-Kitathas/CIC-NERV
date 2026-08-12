@@ -217,6 +217,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     surface_entity = entities.get("local-weather-surface", {})
     forecast_entity = entities.get("local-weather-nws-forecast", {})
     estimate_entity = entities.get("local-weather-estimate", {})
+    radar_entity = entities.get("local-weather-radar", {})
 
     weather = _component(weather_entity, "WeatherState") or {}
     forecast_daily = _component(weather_entity, "WeatherForecastState") or {}
@@ -229,6 +230,8 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     forecast_obs = _component(forecast_entity, "ObservationState") or {}
     estimate = _component(estimate_entity, "CurrentWeatherEstimateState") or {}
     estimate_obs = _component(estimate_entity, "ObservationState") or {}
+    radar = _component(radar_entity, "RadarMosaicState") or {}
+    radar_obs = _component(radar_entity, "ObservationState") or {}
 
     weather_code = weather.get("weather_code")
     location = (
@@ -265,7 +268,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     }
 
     return {
-        "api_version": 2,
+        "api_version": 3,
         "presentation": {
             "mode": "read-only",
             "generated_at": _now_iso(),
@@ -289,6 +292,64 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
             **alerts,
             "authoritative_now": alerts_obs.get("availability") == "current",
             "observation": obs(alerts_obs),
+        },
+        "radar": {
+            **radar,
+            "current_now": radar_obs.get("availability") == "current",
+            "displayable_now": bool(radar.get("image_sha256"))
+            and radar_obs.get("availability") in ("current", "degraded"),
+            "frame_state": (
+                "CURRENT"
+                if radar.get("image_sha256")
+                and radar_obs.get("availability") == "current"
+                else "DEGRADED"
+                if radar.get("image_sha256")
+                and radar_obs.get("availability") == "degraded"
+                else "LAST KNOWN"
+                if radar.get("image_sha256")
+                else "UNAVAILABLE"
+            ),
+            "warning_overlay_current": bool(radar.get("warning_overlay_available"))
+            and radar_obs.get("availability") in ("current", "degraded"),
+            "warning_overlay_state": (
+                "CURRENT"
+                if radar.get("warning_overlay_available")
+                and radar_obs.get("availability") in ("current", "degraded")
+                else "LAST KNOWN"
+                if radar.get("warning_overlay_available")
+                else "UNAVAILABLE"
+            ),
+            "stream_age_seconds": _freshness_seconds(
+                radar.get("stream_latest_at")
+            ),
+            "frame_retrieval_age_seconds": _freshness_seconds(
+                radar.get("frame_retrieved_at")
+            ),
+            "last_success_age_seconds": _freshness_seconds(
+                radar_obs.get("last_success_at")
+            ),
+            "image_url": (
+                None
+                if not radar.get("image_sha256")
+                else "/radar/latest.png?sha=" + str(radar.get("image_sha256"))
+            ),
+            "warning_image_url": (
+                None
+                if not radar.get("warning_image_sha256")
+                or not (
+                    radar.get("warning_overlay_available")
+                    and radar_obs.get("availability") in ("current", "degraded")
+                )
+                else "/radar/warnings.png?sha="
+                + str(radar.get("warning_image_sha256"))
+            ),
+            "legend_image_url": (
+                None
+                if not radar.get("legend_image_sha256")
+                else "/radar/legend.png?sha="
+                + str(radar.get("legend_image_sha256"))
+            ),
+            "observation": obs(radar_obs),
         },
         "feed": list(feed or []),
     }

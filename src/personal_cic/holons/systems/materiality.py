@@ -17,6 +17,7 @@ from personal_cic.core.world.components import (
     SurfaceObservationNetworkState,
     NWSHourlyForecastState,
     CurrentWeatherEstimateState,
+    RadarMosaicState,
 )
 
 
@@ -199,6 +200,34 @@ def telemetry_significance(
             return 0 if value < 20 else 1 if value < 50 else 2 if value < 80 else 3
         old_semantic = (None if old is None else old.short_forecast, pop_band(old))
         new_semantic = (None if new is None else new.short_forecast, pop_band(new))
+        return "material" if old_semantic != new_semantic else "sample"
+
+
+    if isinstance(current, RadarMosaicState) and isinstance(previous, RadarMosaicState):
+        # A new 2-minute image frame is sample telemetry. Durable history records
+        # structural product/bounds/overlay-mode changes, not every pixel update.
+        old_semantic = (
+            previous.provider,
+            previous.product,
+            previous.layer,
+            round(previous.west, 5),
+            round(previous.south, 5),
+            round(previous.east, 5),
+            round(previous.north, 5),
+            previous.range_miles,
+            previous.warning_overlay_available,
+        )
+        new_semantic = (
+            current.provider,
+            current.product,
+            current.layer,
+            round(current.west, 5),
+            round(current.south, 5),
+            round(current.east, 5),
+            round(current.north, 5),
+            current.range_miles,
+            current.warning_overlay_available,
+        )
         return "material" if old_semantic != new_semantic else "sample"
 
     if isinstance(current, CurrentWeatherEstimateState) and isinstance(previous, CurrentWeatherEstimateState):
