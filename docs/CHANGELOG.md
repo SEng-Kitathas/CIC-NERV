@@ -1,3 +1,12 @@
+## 0.3.5 — Slice 003e Surface Freshness Resilience
+
+- Add explicit retained-observation status for policy-bounded last-known data.
+- A transient AviationWeather retrieval failure degrades surface authority without discarding still-fresh METAR state.
+- Current-weather fusion continues to use retained METAR while the configured report-age policy remains satisfied.
+- Retention is forbidden until at least one fresh METAR success has occurred in the current runtime epoch, preserving the re-entry law.
+- Surface/alert HMI freshness now reports age since last successful retrieval rather than age since the latest attempt.
+- If retained METAR ages beyond its configured freshness limit, surface authority becomes unavailable and normal fallback applies.
+
 # Changelog
 
 ### 0.3.4 RC2 — Radar loop playback stability

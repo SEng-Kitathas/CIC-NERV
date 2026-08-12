@@ -108,10 +108,14 @@ def ingest_observation_batch(
         observation.status is ObservationStatus.PARTIAL
         for observation in observations
     )
+    retained = any(
+        observation.status is ObservationStatus.RETAINED
+        for observation in observations
+    )
 
     if observations and unavailable_count == len(observations):
         availability = ObservationAvailability.UNAVAILABLE
-    elif unavailable_count or partial:
+    elif unavailable_count or partial or retained:
         availability = ObservationAvailability.DEGRADED
     else:
         availability = ObservationAvailability.CURRENT

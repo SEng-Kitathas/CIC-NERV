@@ -145,3 +145,8 @@ Radar image bytes are adapter-owned cache artifacts under `state/radar/`; only t
 ## 0.3.4 radar context / temporal presentation boundary
 
 Radar remains a typed current-world observation while recent image frames and map geometry remain adapter-owned presentation artifacts. `RadarMosaicState` may project a bounded sequence of hash-addressed frame references; normal sequence turnover is not durable history. `RadarContextState` separately carries exact-artifact and semantic-content hashes for Census TIGERweb reference geometry. The browser fetches both images and context only from hash-checked loopback routes. Geographic context does not acquire meteorological authority merely because it is co-rendered with radar.
+
+
+## 0.3.5 remote surface freshness resilience
+
+A failed retrieval attempt and invalid domain evidence are distinct facts. For AviationWeather METAR, a failed request may produce a DEGRADED retained observation only after this runtime epoch has already earned a fresh METAR success and only while the report timestamp remains inside the configured source-age policy. Re-entry still withdraws authority and retention cannot re-authorize persisted state before fresh post-restart observation. Once report age exceeds policy, the surface observation becomes UNAVAILABLE and fusion may fall back to a model source.

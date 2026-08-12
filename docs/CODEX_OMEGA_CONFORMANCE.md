@@ -62,3 +62,12 @@ Radar metadata authority lives in `RadarMosaicState`; raw image bytes remain ada
 - **Authority separation:** Census map context is reference geometry, not weather evidence; warning overlays retain radar-observation authority rules.
 - **Materiality:** ordinary frame-set turnover and context retrieval-time refresh are sample telemetry; semantic context content and structural radar authority changes remain material.
 - **Presentation boundary:** browser access is loopback-only and hash-checked; it does not contact NOAA/NWS/Census providers directly.
+
+
+## 0.3.5 retained-observation conformance
+
+- Retrieval failure is not silently equated with domain invalidity.
+- Retained state is explicitly DEGRADED and reasoned, never presented as newly observed.
+- Last-success time is preserved during retention.
+- Re-entry requires fresh success before retention is eligible.
+- Source-specific freshness policy, not an arbitrary failure counter, decides when retained authority expires.

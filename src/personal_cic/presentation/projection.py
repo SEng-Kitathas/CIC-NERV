@@ -249,6 +249,7 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
             "checked_at": value.get("checked_at"),
             "last_success_at": value.get("last_success_at"),
             "freshness_seconds": _freshness_seconds(value.get("checked_at")),
+            "last_success_age_seconds": _freshness_seconds(value.get("last_success_at")),
             "reasons": value.get("reasons", []),
         }
 

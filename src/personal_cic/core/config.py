@@ -88,7 +88,7 @@ class NWSAlertsConfig:
     enabled: bool = True
     interval_seconds: float = 60.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.4 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.5 (local personal system)"
 
     @classmethod
     def from_mapping(cls, data: dict | None) -> "NWSAlertsConfig":
@@ -96,7 +96,7 @@ class NWSAlertsConfig:
             return cls()
         interval = float(data.get("interval_seconds", 60.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.4 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.5 (local personal system)")).strip()
         if interval < 30.0:
             raise ValueError(
                 "NWS alert interval_seconds must be >= 30 seconds to respect "
@@ -119,7 +119,7 @@ class AviationSurfaceConfig:
     enabled: bool = True
     interval_seconds: float = 60.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.4 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.5 (local personal system)"
     station_ids: tuple[str, ...] = ("KEQY", "KCLT", "KJQF")
     max_age_minutes: float = 90.0
 
@@ -129,7 +129,7 @@ class AviationSurfaceConfig:
             return cls()
         interval = float(data.get("interval_seconds", 60.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.4 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.5 (local personal system)")).strip()
         raw_ids = data.get("station_ids", ["KEQY", "KCLT", "KJQF"])
         station_ids = tuple(str(item).strip().upper() for item in raw_ids if str(item).strip())
         max_age = float(data.get("max_age_minutes", 90.0))
@@ -151,7 +151,7 @@ class NWSForecastConfig:
     enabled: bool = True
     interval_seconds: float = 300.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.4 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.5 (local personal system)"
     points_refresh_seconds: float = 21600.0
 
     @classmethod
@@ -160,7 +160,7 @@ class NWSForecastConfig:
             return cls()
         interval = float(data.get("interval_seconds", 300.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.4 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.5 (local personal system)")).strip()
         refresh = float(data.get("points_refresh_seconds", 21600.0))
         if interval < 60.0:
             raise ValueError("NWS forecast interval_seconds must be >= 60 seconds")
@@ -178,7 +178,7 @@ class RadarConfig:
     enabled: bool = True
     interval_seconds: float = 120.0
     timeout_seconds: float = 8.0
-    user_agent: str = "Personal-CIC/0.3.4 (local personal system)"
+    user_agent: str = "Personal-CIC/0.3.5 (local personal system)"
     range_miles: float = 75.0
     image_width: int = 900
     image_height: int = 600
@@ -196,7 +196,7 @@ class RadarConfig:
             return cls()
         interval = float(data.get("interval_seconds", 120.0))
         timeout = float(data.get("timeout_seconds", 8.0))
-        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.4 (local personal system)")).strip()
+        user_agent = str(data.get("user_agent", "Personal-CIC/0.3.5 (local personal system)")).strip()
         range_miles = float(data.get("range_miles", 75.0))
         image_width = int(data.get("image_width", 900))
         image_height = int(data.get("image_height", 600))

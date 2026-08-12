@@ -11,20 +11,24 @@ class ObservationStatus(str, Enum):
     """Truth status for one adapter observation.
 
     OBSERVED means the adapter successfully inspected the source and produced a
-    complete normalized value. PARTIAL means a useful value exists but one or more
-    subordinate facts could not be observed. UNAVAILABLE means the source could not
-    be inspected and no new domain value may be inferred from that failure.
+    complete normalized value. PARTIAL means a useful newly inspected value exists
+    but one or more subordinate facts could not be observed. UNAVAILABLE means the
+    source could not be inspected and no new domain value may be inferred from that
+    failure. RETAINED means the latest inspection failed but an explicit source
+    freshness policy still licenses the previously observed domain value for use.
     """
 
     OBSERVED = "observed"
     PARTIAL = "partial"
     UNAVAILABLE = "unavailable"
+    RETAINED = "retained"
 
 
 class ObservationAvailability(str, Enum):
     CURRENT = "current"
     DEGRADED = "degraded"
     UNAVAILABLE = "unavailable"
+    RETAINED = "retained"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +56,16 @@ class Observation(Generic[T]):
         return cls(
             source=source,
             status=ObservationStatus.UNAVAILABLE,
+            value=None,
+            detail=detail,
+        )
+
+    @classmethod
+    def retained(cls, source: str, detail: str) -> "Observation[T]":
+        """No fresh sample arrived, but prior domain state remains usable by policy."""
+        return cls(
+            source=source,
+            status=ObservationStatus.RETAINED,
             value=None,
             detail=detail,
         )

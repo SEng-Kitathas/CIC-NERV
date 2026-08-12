@@ -15,7 +15,7 @@ class WeatherFusionTests(unittest.TestCase):
         om=WeatherState("Test","Open-Meteo","t","America/New_York",79.0,80.0,80.0,0.0,61,90.0,10.0,260.0,20.0)
         hour=NWSForecastHour("2026-08-11T20:00:00-04:00",78.0,72.0,80.0,60.0,5.0,10.0,"SW","Showers")
         nws=NWSHourlyForecastState("Test","NWS","GSP",1,2,"g","u",(hour,))
-        out=derive_current_weather_estimate(location_label="Test",surface=surface,surface_current=True,open_meteo=om,open_meteo_current=True,nws_forecast=nws,nws_current=True)
+        out=derive_current_weather_estimate(location_label="Test",surface=surface,surface_usable=True,open_meteo=om,open_meteo_current=True,nws_forecast=nws,nws_current=True)
         self.assertEqual(out.temperature_f,76.0)
         self.assertEqual(out.primary_source,"NOAA/NWS AviationWeather.gov METAR")
         self.assertEqual(out.flight_category,"MVFR")
@@ -33,12 +33,12 @@ class WeatherFusionTests(unittest.TestCase):
 
     def test_open_meteo_is_explicit_fallback_not_peer_average(self):
         om=WeatherState("Test","Open-Meteo","t","America/New_York",79.0,80.0,80.0,0.0,1,20.0,10.0,180.0,15.0)
-        out=derive_current_weather_estimate(location_label="Test",surface=None,surface_current=False,open_meteo=om,open_meteo_current=True,nws_forecast=None,nws_current=False)
+        out=derive_current_weather_estimate(location_label="Test",surface=None,surface_usable=False,open_meteo=om,open_meteo_current=True,nws_forecast=None,nws_current=False)
         self.assertEqual(out.temperature_f,79.0)
         self.assertEqual(out.method,"openmeteo_model_fallback")
         self.assertEqual(out.surface_station_count,0)
 
     def test_no_current_source_yields_no_estimate(self):
-        self.assertIsNone(derive_current_weather_estimate(location_label="Test",surface=None,surface_current=False,open_meteo=None,open_meteo_current=False,nws_forecast=None,nws_current=False))
+        self.assertIsNone(derive_current_weather_estimate(location_label="Test",surface=None,surface_usable=False,open_meteo=None,open_meteo_current=False,nws_forecast=None,nws_current=False))
 
 if __name__ == "__main__": unittest.main()

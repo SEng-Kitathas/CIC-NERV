@@ -261,6 +261,7 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(projection["surface"]["wind_gust_max_mph"],15.0)
         self.assertEqual(projection["surface"]["visibility_min_sm"],10.0)
         self.assertEqual(projection["surface"]["ceiling_min_ft_agl"],3000)
+        self.assertIn("last_success_age_seconds", projection["surface"]["observation"])
         self.assertEqual(projection["nws_forecast"]["hours"][0]["short_forecast"],"Showers")
         self.assertTrue(projection["estimate"]["current_now"])
         self.assertNotIn("authoritative_now", projection["estimate"])
@@ -510,6 +511,7 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("building distinct frames // autoplay at", WORLD_HTML)
         self.assertIn('aria-label="Previous radar frame"', WORLD_HTML)
         self.assertIn('aria-label="Next radar frame"', WORLD_HTML)
+        self.assertIn("s since successful retrieval", WORLD_HTML)
 
 
 if __name__ == "__main__":

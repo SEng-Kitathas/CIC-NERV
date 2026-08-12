@@ -156,3 +156,8 @@ GET http://127.0.0.1:8765/api/v1/world
 ### 0.3.4 Radar Context + Loop
 
 The World surface adds a subdued locally cached TIGERweb reference overlay and a bounded real-frame MRMS playback loop. Each frame remains hash-addressed and timestamped; no interpolation is synthesized, and normal loop turnover is sample telemetry.
+
+
+### 0.3.5 Surface Freshness Resilience
+
+Transient AviationWeather transport failure no longer forces an immediate switch away from still-fresh METAR evidence. The surface observation becomes explicitly DEGRADED while the last-known report remains inside its configured age window; fusion stays METAR-backed. Re-entry still requires fresh post-restart success, and genuine report staleness still withdraws authority.

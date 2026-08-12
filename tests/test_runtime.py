@@ -85,19 +85,19 @@ class RuntimeConfigTests(unittest.TestCase):
 
         self.assertEqual(
             config.surface.user_agent,
-            "Personal-CIC/0.3.4 (local personal system)",
+            "Personal-CIC/0.3.5 (local personal system)",
         )
         self.assertEqual(
             config.forecast.user_agent,
-            "Personal-CIC/0.3.4 (local personal system)",
+            "Personal-CIC/0.3.5 (local personal system)",
         )
         self.assertEqual(
             config.alerts.user_agent,
-            "Personal-CIC/0.3.4 (local personal system)",
+            "Personal-CIC/0.3.5 (local personal system)",
         )
         self.assertEqual(
             config.radar.user_agent,
-            "Personal-CIC/0.3.4 (local personal system)",
+            "Personal-CIC/0.3.5 (local personal system)",
         )
 
     def test_world_awareness_radar_config(self):

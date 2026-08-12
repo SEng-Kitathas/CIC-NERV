@@ -35,7 +35,7 @@ def derive_current_weather_estimate(
     *,
     location_label: str,
     surface: SurfaceObservationNetworkState | None,
-    surface_current: bool,
+    surface_usable: bool,
     open_meteo: WeatherState | None,
     open_meteo_current: bool,
     nws_forecast: NWSHourlyForecastState | None,
@@ -47,7 +47,7 @@ def derive_current_weather_estimate(
     if surface and surface.stations and surface.selected_station_id:
         selected = next((s for s in surface.stations if s.station_id == surface.selected_station_id), None)
 
-    if surface_current and surface and surface.temperature_median_f is not None:
+    if surface_usable and surface and surface.temperature_median_f is not None:
         temp = surface.temperature_median_f
         dew = surface.dewpoint_median_f
         rh = surface.relative_humidity_percent

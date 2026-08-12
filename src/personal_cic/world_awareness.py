@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import threading
 import time
 
@@ -13,7 +14,11 @@ from personal_cic.adapters.world import (
 )
 from personal_cic.bootstrap import RuntimeContext, ingest_observation_batch
 from personal_cic.core.config import WorldAwarenessConfig
-from personal_cic.core.observations import Observation, ObservationAvailability
+from personal_cic.core.observations import (
+    Observation,
+    ObservationAvailability,
+    ObservationStatus,
+)
 from personal_cic.core.world.components import (
     NWSHourlyForecastState,
     ObservationState,
@@ -96,6 +101,8 @@ class WorldAwarenessWorker:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Runtime-epoch proof: persisted state cannot use retention to bypass re-entry.
+        self._surface_fresh_since_reentry = False
 
     def _ensure_entities(self) -> None:
         self.context.world.ensure_entity(WEATHER_ENTITY_ID, "Local Weather")
@@ -118,6 +125,7 @@ class WorldAwarenessWorker:
     def prepare_reentry(self) -> None:
         if not self.config.enabled:
             return
+        self._surface_fresh_since_reentry = False
         self._ensure_entities()
         if self.config.weather.enabled:
             self._withdraw(WEATHER_ENTITY_ID, self.weather_adapter.ADAPTER_ID, "awaiting fresh Open-Meteo observation")
@@ -168,7 +176,13 @@ class WorldAwarenessWorker:
         state = derive_current_weather_estimate(
             location_label=self.config.location.label,
             surface=surface,
-            surface_current=bool(surface_obs and surface_obs.availability is ObservationAvailability.CURRENT),
+            surface_usable=bool(
+                surface_obs
+                and surface_obs.availability in (
+                    ObservationAvailability.CURRENT,
+                    ObservationAvailability.DEGRADED,
+                )
+            ),
             open_meteo=weather,
             open_meteo_current=bool(weather_obs and weather_obs.availability is ObservationAvailability.CURRENT),
             nws_forecast=forecast,
@@ -193,8 +207,70 @@ class WorldAwarenessWorker:
     def _collect_alerts(self) -> None:
         ingest_observation_batch(self.context, entity_id=ALERTS_ENTITY_ID, adapter_id=self.alerts_adapter.ADAPTER_ID, observations=self.alerts_adapter.collect(), publish_cycle=False)
 
+    @staticmethod
+    def _parse_time(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _surface_retention_is_earned(self) -> bool:
+        """Return true only for fresh-enough METAR state observed in this runtime epoch."""
+        if not self._surface_fresh_since_reentry:
+            return False
+        state = self.context.world.get_component(
+            SURFACE_ENTITY_ID,
+            SurfaceObservationNetworkState,
+        )
+        if state is None:
+            return False
+        freshest = self._parse_time(state.freshest_observed_at)
+        if freshest is None:
+            return False
+        age_minutes = (
+            datetime.now(timezone.utc) - freshest
+        ).total_seconds() / 60.0
+        return -5.0 <= age_minutes <= self.config.surface.max_age_minutes
+
     def _collect_surface(self) -> None:
-        ingest_observation_batch(self.context, entity_id=SURFACE_ENTITY_ID, adapter_id=self.surface_adapter.ADAPTER_ID, observations=self.surface_adapter.collect(), publish_cycle=False)
+        observations = self.surface_adapter.collect()
+        fresh = any(
+            observation.status in (ObservationStatus.OBSERVED, ObservationStatus.PARTIAL)
+            for observation in observations
+        )
+        failed = bool(observations) and all(
+            observation.status is ObservationStatus.UNAVAILABLE
+            for observation in observations
+        )
+
+        if fresh:
+            self._surface_fresh_since_reentry = True
+        elif failed and self._surface_retention_is_earned():
+            raw_detail = next(
+                (observation.detail for observation in observations if observation.detail),
+                "surface retrieval failed",
+            )
+            observations = (
+                Observation.retained(
+                    "aviationweather.metar",
+                    "retained: latest METAR retrieval failed; last-known surface "
+                    f"observation remains inside the configured {self.config.surface.max_age_minutes:g} minute "
+                    f"freshness window // {raw_detail}",
+                ),
+            )
+
+        ingest_observation_batch(
+            self.context,
+            entity_id=SURFACE_ENTITY_ID,
+            adapter_id=self.surface_adapter.ADAPTER_ID,
+            observations=observations,
+            publish_cycle=False,
+        )
         self._recompute_estimate()
 
     def _collect_forecast(self) -> None:
