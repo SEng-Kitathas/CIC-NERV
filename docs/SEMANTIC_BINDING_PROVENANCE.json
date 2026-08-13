@@ -1,0 +1,9 @@
+{
+  "source_artifact": "PERSONAL_CIC_036_003F_QA1_R2_AUTHORITATIVE_SOURCE_2026-08-13.tar.gz",
+  "source_sha256": "c06e05389b35bdf0190ef6f54e3057b059d88b95b37e4691a6737b0450dd973f",
+  "integration": "003f semantic binding RC1",
+  "authority": "read-only additive semantic projection",
+  "world_snapshot_schema_changed": false,
+  "event_journal_schema_changed": false,
+  "runtime_ontology_dependency_added": false
+}
