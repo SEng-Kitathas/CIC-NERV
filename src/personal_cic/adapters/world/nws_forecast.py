@@ -146,10 +146,11 @@ class NWSHourlyForecastAdapter:
     def collect(self) -> tuple[Observation[object], ...]:
         try:
             self._resolve()
-            assert self._forecast_url is not None
+            if self._forecast_url is None:
+                raise ValueError("NWS forecast discovery did not produce an hourly endpoint")
             payload = self._request_json(self._forecast_url)
             state = self._parse(payload)
-        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, TypeError, ValueError, AssertionError) as exc:
+        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             # A failed cached endpoint is re-resolved on the next cycle.
             self._forecast_url = None
             return (Observation.unavailable("nws.forecast.hourly", f"NWS forecast request failed: {exc}"),)

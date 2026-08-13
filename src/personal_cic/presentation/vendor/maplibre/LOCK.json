@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "dependency": "maplibre-gl-js",
+  "version": "5.24.0",
+  "source_repository": "https://github.com/maplibre/maplibre-gl-js",
+  "release_url": "https://github.com/maplibre/maplibre-gl-js/releases/download/v5.24.0/dist.zip",
+  "release_archive_sha256": "edcc812e8334825d91cd97b54c3953e361cfbf6c8f37f0b01312181a855522e6",
+  "required_files": [
+    "maplibre-gl.js",
+    "maplibre-gl.css",
+    "LICENSE.txt"
+  ],
+  "materialization": "tools/install-maplibre-vendor.py",
+  "authority_note": "Pinned reference-rendering dependency. Its runtime bytes are qualified by exact archive identity; it has no world-state authority.",
+  "release_archive_size_bytes": 8016600,
+  "introduced_in_lineage": "003f RC2D; retained through RC2D-R2-QA1"
+}

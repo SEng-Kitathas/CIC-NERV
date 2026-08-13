@@ -6,3 +6,9 @@ state/*.json
 state/radar/
 logs/*
 !logs/.gitkeep
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+*.whl

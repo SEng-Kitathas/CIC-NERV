@@ -289,6 +289,33 @@ class WorldContinuityTests(unittest.TestCase):
         self.assertEqual(state.nws_reference_delta_f,15.0)
         self.assertEqual(state.nws_reference_start,"2026-08-11T20:00:00-04:00")
 
+    def test_unknown_future_snapshot_schema_is_rejected(self):
+        import json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "world.json"
+            path.write_text(json.dumps({"schema_version": 4, "entities": {}}), encoding="utf-8")
+            world = WorldState(EventBus())
+            with self.assertRaises(ValueError):
+                world.hydrate_json(path)
+
+    def test_snapshot_root_and_entities_shape_are_validated(self):
+        import json
+
+        payloads = (
+            [],
+            {"schema_version": 2, "entities": []},
+            {"schema_version": "2", "entities": {}},
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "world.json"
+                    path.write_text(json.dumps(payload), encoding="utf-8")
+                    world = WorldState(EventBus())
+                    with self.assertRaises(ValueError):
+                        world.hydrate_json(path)
+
 
 if __name__ == "__main__":
     unittest.main()

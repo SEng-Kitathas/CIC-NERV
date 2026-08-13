@@ -21,7 +21,7 @@ These are explicit backlog, not hidden compliance claims:
 2. `Intent` is still stringly and uses `dict[str, Any]`; control authority is not yet embodied.
 3. `UsbDeviceState.mode` is still an open string despite a currently small known state family.
 4. A single `ObservationState` currently assumes one primary adapter per entity. Multi-source entities will need keyed source-observation state before promotion.
-5. World-state serialization deliberately mirrors registered component dataclasses and is versioned, but does not yet have explicit per-version migrations.
+5. World-state serialization deliberately mirrors registered component dataclasses. The writer remains schema v2 and the reader explicitly admits evidenced v1/v2/v3 historical lineage, but explicit per-version migration functions are still not embodied.
 6. Tenda interface attribution still assumes the CIC's relevant WLAN surface and has not yet been proven against a host with multiple unrelated Wi-Fi adapters.
 
 ## Promotion rule
@@ -71,3 +71,29 @@ Radar metadata authority lives in `RadarMosaicState`; raw image bytes remain ada
 - Last-success time is preserved during retention.
 - Re-entry requires fresh success before retention is eligible.
 - Source-specific freshness policy, not an arbitrary failure counter, decides when retained authority expires.
+## 0.3.6 / 003f current candidate conformance — RC2D-R2-QA1
+
+This section is an internal assurance assessment, not an external certification claim. The running
+target and claim-matched gates retain veto authority.
+
+- **G0 Build/existence:** authored source compiles/imports under the audit interpreter; full unit regression passes. A fresh map-capable deployment additionally requires materialized pinned MapLibre runtime bytes.
+- **G1 Type/boundary:** configuration now parses strict booleans, finite numbers, structured arrays/maps, environment names, and source-provenanced site anchors at ingress. Broad dynamic carrier types remain explicit debt at ECS/event seams.
+- **G2 State/protocol:** collection center, fixed site anchor, and live operator position are distinct; unavailable/current/degraded states and same-lineage traffic association remain explicit.
+- **G3 Resource/effect:** vendor/remote acquisition remains in adapters. Presentation is read-only. Service install refuses an incomplete required presentation runtime.
+- **G4 Temporal/concurrency:** worker stop returns actual quiescence; timeout is not success. Concurrent journal append is serialized. Runtime does not force a final snapshot while a state-mutating worker remains live.
+- **G5 Serialization/persistence:** snapshot writer remains v2; known historical v1/v2/v3 are explicitly readable; unknown future versions fail closed. Explicit migrations remain debt.
+- **G6 Security/authority:** loopback-only bind and GET/HEAD presentation authority remain; secrets stay environment-based; service adds no-new-privileges and restrictive umask. Inline script/style CSP remains accepted presentation debt at the current sovereignty level.
+- **G7 Architecture/holonic:** no new generic provider manager or semantic god-object was introduced. Existing large functions are recorded as refactor pressure, not mechanically split without an invariant.
+- **G8 Verification:** regression, concurrency, configuration, persistence, source-distribution, coverage, syntax, JSON, shell, and artifact-integrity evidence are retained by the QA audit. Human HMI acceptance remains separate.
+- **G9 Continuity/governance:** promoted RC1B floor, open 003f slice, candidate chronology, donor/non-lineage distinction, and unearned RC2D-R2/QA1 status are explicit.
+- **G10 Supply chain:** MapLibre source/version/archive digest and target Python direct dependency are configuration-controlled separately from authored source. Build-toolchain locking is not yet target-qualified.
+- **G11 Performance:** no new quantitative performance claim is promoted by QA1. Operator reports of smoothness are useful target evidence but are not a benchmark.
+
+### Additional residual seams accepted by QA1
+
+- browser CSP still requires `unsafe-inline` for the current inline presentation implementation; S3/S4 presentation-sovereignty work should remove this when the frontend substrate earns that refactor;
+- remote provider response-size/content-type bounds are inconsistent across adapters and should be hardened when that acquisition surface becomes the active pressure;
+- the static `SITE 15 MI` label has a dormant generic-profile fallback to collection center when site anchoring is disabled; the configured target has an enabled site anchor, so the path is inactive but recorded;
+- several domain/projector functions are large; splitting them solely to satisfy a line-count heuristic would violate abstraction-before-invariant discipline;
+- Python build-backend reproducibility is not yet an exact target lock; do not call the source package hermetic.
+

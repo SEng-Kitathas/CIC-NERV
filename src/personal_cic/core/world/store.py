@@ -10,7 +10,12 @@ from .entity import Entity
 
 
 class WorldState:
+    # Current writer remains v2 because deployed target evidence shows v2 on disk.
+    # Historical hydration tests require v1 and a radar-era v3 fixture. Until the
+    # lineage is deliberately normalized, read those explicitly and reject unknown
+    # future versions rather than silently interpreting them as today's schema.
     SCHEMA_VERSION = 2
+    READABLE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 
     def __init__(self, events: EventBus) -> None:
         self.events = events
@@ -103,15 +108,38 @@ class WorldState:
             return 0
 
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("world snapshot root must be a JSON object")
+        version = data.get("schema_version")
+        if isinstance(version, bool) or not isinstance(version, int):
+            raise ValueError("world snapshot schema_version must be an integer")
+        if version not in self.READABLE_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"unsupported world snapshot schema_version {version}; "
+                f"readable versions are {sorted(self.READABLE_SCHEMA_VERSIONS)}"
+            )
+        entities = data.get("entities")
+        if not isinstance(entities, dict):
+            raise ValueError("world snapshot entities must be a JSON object")
+
         with self._lock:
             restored = 0
-            for entity_id, entity_data in data.get("entities", {}).items():
-                entity = self.ensure_entity(
-                    entity_id,
-                    entity_data.get("label", entity_id),
-                )
-                for name, payload in entity_data.get("components", {}).items():
+            for entity_id, entity_data in entities.items():
+                if not isinstance(entity_id, str) or not isinstance(entity_data, dict):
+                    raise ValueError("world snapshot entity records must be keyed JSON objects")
+                components = entity_data.get("components", {})
+                if not isinstance(components, dict):
+                    raise ValueError(f"world snapshot components for {entity_id!r} must be a JSON object")
+                label = entity_data.get("label", entity_id)
+                if not isinstance(label, str):
+                    raise ValueError(f"world snapshot label for {entity_id!r} must be a string")
+                entity = self.ensure_entity(entity_id, label)
+                for name, payload in components.items():
+                    if not isinstance(name, str):
+                        raise ValueError(f"world snapshot component name for {entity_id!r} must be a string")
                     if not isinstance(payload, dict):
+                        # Preserve the historical tolerance for unknown/non-object
+                        # component payloads; they cannot be safely reconstructed.
                         continue
                     component = decode_component(name, payload)
                     if component is not None:

@@ -11,6 +11,8 @@ from personal_cic.core.world.components import (
     TrafficEventCollectionState,
     TrafficEventObservation,
     TrafficEventKernel,
+    TrafficFlowCollectionState,
+    TrafficFlowProbeObservation,
     TrafficSituationState,
 )
 
@@ -105,6 +107,55 @@ class TrafficContinuityTests(unittest.TestCase):
             restored.get_component("traffic", ObservationState).availability,
             ObservationAvailability.CURRENT,
         )
+
+    def test_tomtom_event_extensions_and_flow_state_round_trip(self):
+        world = WorldState(EventBus())
+        world.ensure_entity("tomtom-events", "TomTom Events")
+        event = TrafficEventObservation(
+            source_record_id="TTI-1", source_family="TomTom Traffic",
+            provider="TomTom Orbis Incident Details", collection_class="commercial_report",
+            event_type="jam", event_subtype=None, description="Stopped traffic", roadway="US-74",
+            direction=None, county=None, geometry=(GeoPoint(35.11, -80.61), GeoPoint(35.12, -80.62)),
+            start_at="2026-08-12T15:09:30+00:00", magnitude_of_delay="major", delay_seconds=201,
+            length_meters=119.1, road_numbers=("US-74",), from_location="A", to_location="B",
+            probability_of_occurrence="certain", time_validity="present", event_details=("Stopped traffic",),
+            event_codes=(101,), community_report_count=1, community_last_report_at="2025-06-26T23:36:00+00:00",
+            source_organization="TomTom Traffic", source_id="TTI-1", upstream_event_id="TTI-1",
+        )
+        event_state = TrafficEventCollectionState(
+            location_label="Indian Trail", provider="TomTom Orbis Incident Details",
+            source_family="TomTom Traffic", collection_class="commercial_report",
+            scope_center_latitude=35.1115, scope_center_longitude=-80.6099, scope_radius_miles=75,
+            source_record_count=1, local_record_count=1, freshest_source_at=None, events=(event,),
+        )
+        world.upsert_component("tomtom-events", event_state)
+
+        world.ensure_entity("tomtom-flow", "TomTom Flow")
+        flow_probe = TrafficFlowProbeObservation(
+            probe_id="ref", label="Query reference", source_family="TomTom Traffic",
+            provider="TomTom Flow Segment Data", collection_class="commercial_modeled_telemetry",
+            query_latitude=35.22, query_longitude=-80.85, match_method="nearest_road_fragment_to_query_point",
+            functional_road_class="FRC2", current_speed_mph=22, free_flow_speed_mph=44,
+            current_travel_time_seconds=86, free_flow_travel_time_seconds=43, confidence=1.0,
+            road_closure=False, openlr="segment", geometry=(GeoPoint(35.224, -80.859), GeoPoint(35.223, -80.856)),
+        )
+        flow_state = TrafficFlowCollectionState(
+            location_label="Indian Trail", provider="TomTom Flow Segment Data", source_family="TomTom Traffic",
+            collection_class="commercial_modeled_telemetry", scope_center_latitude=35.1115,
+            scope_center_longitude=-80.6099, scope_radius_miles=75, configured_probe_count=1,
+            successful_probe_count=1, probes=(flow_probe,),
+        )
+        world.upsert_component("tomtom-flow", flow_state)
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "world.json"
+            world.write_json(path)
+            restored = WorldState(EventBus())
+            count = restored.hydrate_json(path)
+
+        self.assertEqual(count, 2)
+        self.assertEqual(restored.get_component("tomtom-events", TrafficEventCollectionState), event_state)
+        self.assertEqual(restored.get_component("tomtom-flow", TrafficFlowCollectionState), flow_state)
 
 
 if __name__ == "__main__":

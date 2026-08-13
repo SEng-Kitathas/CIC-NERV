@@ -10,6 +10,8 @@ from personal_cic.core.world.components import (
     TrafficCameraCollectionState,
     TrafficEventCollectionState,
     TrafficEventObservation,
+    TrafficFlowCollectionState,
+    TrafficFlowProbeObservation,
     TrafficMessageSignCollectionState,
     TrafficSituationState,
 )
@@ -181,6 +183,40 @@ class TrafficFusionTests(unittest.TestCase):
         )
         self.assertEqual(state.event_kernel_count, 2)
         self.assertEqual(set(state.current_source_families), {"CMPD CAD", "NCDOT/ATMSERS"})
+
+
+    def test_tomtom_flow_contributes_coverage_without_becoming_event_corroboration(self):
+        tomtom = collection(
+            "TomTom Orbis Incident Details",
+            "TomTom Traffic",
+            [event(record_id="TTI-1", family="TomTom Traffic", provider="TomTom Orbis Incident Details", upstream_id="TTI-1", description="Stopped traffic")],
+        )
+        probe = TrafficFlowProbeObservation(
+            probe_id="ref", label="query reference", source_family="TomTom Traffic",
+            provider="TomTom Flow Segment Data", collection_class="commercial_modeled_telemetry",
+            query_latitude=35.1, query_longitude=-80.6,
+            match_method="nearest_road_fragment_to_query_point", functional_road_class="FRC1",
+            current_speed_mph=30, free_flow_speed_mph=60, current_travel_time_seconds=120,
+            free_flow_travel_time_seconds=60, confidence=1.0, road_closure=False, openlr="segment",
+            geometry=(GeoPoint(35.1, -80.6), GeoPoint(35.11, -80.61)),
+        )
+        flow = TrafficFlowCollectionState(
+            location_label="Indian Trail / 28079", provider="TomTom Flow Segment Data",
+            source_family="TomTom Traffic", collection_class="commercial_modeled_telemetry",
+            scope_center_latitude=35.1115, scope_center_longitude=-80.6099, scope_radius_miles=75,
+            configured_probe_count=1, successful_probe_count=1, probes=(probe,),
+        )
+        state = derive_traffic_situation(
+            location_label="Indian Trail / 28079", center_latitude=35.1115, center_longitude=-80.6099,
+            radius_miles=75.0, event_sources=((tomtom, current()),), cameras=None, cameras_observation=None,
+            signs=None, signs_observation=None, flow=flow, flow_observation=current("tomtom.flow"),
+            configured_unavailable=(),
+        )
+        self.assertEqual(state.event_kernel_count, 1)
+        self.assertEqual(state.flow_probe_count, 1)
+        self.assertEqual(state.source_observation_count, 2)
+        self.assertIn("TomTom Traffic", state.current_source_families)
+        self.assertTrue(any("source independence/event equivalence" in gap for gap in state.collection_gaps))
 
     def test_unavailable_source_is_not_used_as_current_event_evidence(self):
         stale = collection(

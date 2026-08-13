@@ -7,11 +7,15 @@ from threading import Thread
 from typing import Callable
 from urllib.parse import parse_qs, urlsplit
 
+from personal_cic.core.config import SiteAnchorConfig
 from personal_cic.core.world import WorldState
 from .pages import SYSTEMS_HTML, WORLD_HTML
 from .traffic_page import TRAFFIC_HTML
 from .projection import build_systems_projection, build_traffic_projection, build_world_projection
 from .weather_feed import build_weather_feed
+
+
+_MAPLIBRE_VENDOR_DIR = Path(__file__).resolve().parent / "vendor" / "maplibre"
 
 
 class _CICHTTPServer(ThreadingHTTPServer):
@@ -24,6 +28,7 @@ def _handler_factory(
     runtime_metadata: Callable[[], dict],
     event_journal_path: Path | None,
     radar_cache_dir: Path | None,
+    site_anchor: SiteAnchorConfig | None,
 ):
     class Handler(BaseHTTPRequestHandler):
         server_version = "PersonalCIC/0.3"
@@ -34,13 +39,15 @@ def _handler_factory(
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
-            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
             self.send_header(
                 "Content-Security-Policy",
                 "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "connect-src 'self' https://tile.openstreetmap.org; "
+                "worker-src blob:; child-src blob:; "
                 "frame-src https://embed.waze.com; "
-                "img-src 'self' data:; frame-ancestors 'none';",
+                "img-src 'self' data: blob: https://tile.openstreetmap.org; frame-ancestors 'none';",
             )
             if length:
                 self.send_header("Content-Length", str(length))
@@ -50,6 +57,18 @@ def _handler_factory(
             body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             self._headers(status, "application/json; charset=utf-8", len(body))
             self.wfile.write(body)
+
+        def _send_static_asset(self, filename: str, content_type: str):
+            if filename not in {"maplibre-gl.js", "maplibre-gl.css"}:
+                self._send_json({"error": "not_found"}, 404)
+                return
+            path = _MAPLIBRE_VENDOR_DIR / filename
+            if not path.exists() or not path.is_file():
+                self._send_json({"error": "map_engine_asset_unavailable"}, 503)
+                return
+            payload = path.read_bytes()
+            self._headers(200, content_type, len(payload))
+            self.wfile.write(payload)
 
         def _valid_sha(self, value: str | None) -> bool:
             return bool(value and re.fullmatch(r"[0-9a-f]{64}", value))
@@ -131,6 +150,12 @@ def _handler_factory(
                 self._headers(200, "text/html; charset=utf-8", len(payload))
                 self.wfile.write(payload)
                 return
+            if path == "/static/maplibre/maplibre-gl.js":
+                self._send_static_asset("maplibre-gl.js", "text/javascript; charset=utf-8")
+                return
+            if path == "/static/maplibre/maplibre-gl.css":
+                self._send_static_asset("maplibre-gl.css", "text/css; charset=utf-8")
+                return
             if path == "/api/v1/systems":
                 metadata = runtime_metadata()
                 self._send_json(
@@ -145,7 +170,7 @@ def _handler_factory(
                 self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
                 return
             if path == "/api/v1/traffic":
-                self._send_json(build_traffic_projection(world))
+                self._send_json(build_traffic_projection(world, site_anchor=site_anchor))
                 return
             if path == "/radar/latest.png":
                 self._send_cached_png(Path("latest.png"), (query.get("sha") or [None])[0])
@@ -176,6 +201,12 @@ def _handler_factory(
             query = parse_qs(parsed.query)
             if path in ("/", "/systems", "/world", "/traffic"):
                 self._headers(200, "text/html; charset=utf-8")
+            elif path == "/static/maplibre/maplibre-gl.js":
+                asset = _MAPLIBRE_VENDOR_DIR / "maplibre-gl.js"
+                self._headers(200 if asset.is_file() else 503, "text/javascript; charset=utf-8", asset.stat().st_size if asset.is_file() else 0)
+            elif path == "/static/maplibre/maplibre-gl.css":
+                asset = _MAPLIBRE_VENDOR_DIR / "maplibre-gl.css"
+                self._headers(200 if asset.is_file() else 503, "text/css; charset=utf-8", asset.stat().st_size if asset.is_file() else 0)
             elif path in ("/api/v1/systems", "/api/v1/world", "/api/v1/traffic"):
                 self._headers(200, "application/json; charset=utf-8")
             elif path in ("/radar/latest.png", "/radar/warnings.png", "/radar/legend.png"):
@@ -244,6 +275,7 @@ class PresentationServer:
         runtime_metadata: Callable[[], dict],
         event_journal_path: Path | None = None,
         radar_cache_dir: Path | None = None,
+        site_anchor: SiteAnchorConfig | None = None,
     ) -> None:
         if host != "127.0.0.1":
             raise ValueError("Presentation is intentionally loopback-only")
@@ -253,6 +285,7 @@ class PresentationServer:
         self.runtime_metadata = runtime_metadata
         self.event_journal_path = event_journal_path
         self.radar_cache_dir = radar_cache_dir
+        self.site_anchor = site_anchor
         self._httpd: _CICHTTPServer | None = None
         self._thread: Thread | None = None
 
@@ -270,6 +303,7 @@ class PresentationServer:
                 self.runtime_metadata,
                 self.event_journal_path,
                 self.radar_cache_dir,
+                self.site_anchor,
             ),
         )
         self._thread = Thread(target=self._httpd.serve_forever, name="personal-cic-presentation", daemon=True)

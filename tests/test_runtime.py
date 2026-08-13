@@ -31,6 +31,37 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(config.presentation.enabled)
         self.assertFalse(config.world_awareness.enabled)
 
+
+    def test_operator_context_loads_fixed_site_anchor_with_provenance(self):
+        data = self._base()
+        data["operator_context"] = {
+            "site_anchor": {
+                "enabled": True,
+                "label": "CIC SITE",
+                "address": "7004 Dacian Ln, Indian Trail, NC 28079",
+                "latitude": 35.12042277,
+                "longitude": -80.62950725,
+                "position_kind": "fixed_site_anchor",
+                "source_lineage": "Union County NC GIS Address_Point",
+                "source_record_id": "65294",
+                "source_verified_at": "2026-08-13T15:42:00Z",
+                "source_artifact_sha256": "5cfcd68382511b5639dab09355a8e26919b50bf83f3f5660fb891488dd674d4b",
+            }
+        }
+        config = self._load(data)
+        site = config.operator_context.site_anchor
+        self.assertTrue(site.enabled)
+        self.assertEqual(site.position_kind, "fixed_site_anchor")
+        self.assertAlmostEqual(site.latitude, 35.12042277)
+        self.assertAlmostEqual(site.longitude, -80.62950725)
+        self.assertEqual(site.source_record_id, "65294")
+
+    def test_operator_context_rejects_enabled_site_anchor_without_coordinates(self):
+        data = self._base()
+        data["operator_context"] = {"site_anchor": {"enabled": True, "label": "CIC SITE"}}
+        with self.assertRaises(ValueError):
+            self._load(data)
+
     def test_runtime_config_loads_loopback_presentation(self):
         data = self._base()
         data["presentation"] = {"enabled": True, "bind_host": "127.0.0.1", "port": 8765}
@@ -85,19 +116,19 @@ class RuntimeConfigTests(unittest.TestCase):
 
         self.assertEqual(
             config.surface.user_agent,
-            "Personal-CIC/0.3.5 (local personal system)",
+            "Personal-CIC/0.3.6 (local personal system)",
         )
         self.assertEqual(
             config.forecast.user_agent,
-            "Personal-CIC/0.3.5 (local personal system)",
+            "Personal-CIC/0.3.6 (local personal system)",
         )
         self.assertEqual(
             config.alerts.user_agent,
-            "Personal-CIC/0.3.5 (local personal system)",
+            "Personal-CIC/0.3.6 (local personal system)",
         )
         self.assertEqual(
             config.radar.user_agent,
-            "Personal-CIC/0.3.5 (local personal system)",
+            "Personal-CIC/0.3.6 (local personal system)",
         )
 
     def test_world_awareness_radar_config(self):
@@ -167,6 +198,116 @@ class RuntimeConfigTests(unittest.TestCase):
             WorldAwarenessConfig.from_mapping(
                 {"enabled": True, "radar": {"interval_seconds": 30}}
             )
+
+    def test_runtime_rejects_nonpositive_or_nonfinite_core_intervals(self):
+        for key, value in (
+            ("collection_interval_seconds", 0),
+            ("collection_interval_seconds", -1),
+            ("snapshot_interval_seconds", 0),
+            ("snapshot_interval_seconds", "nan"),
+        ):
+            with self.subTest(key=key, value=value):
+                data = self._base()
+                data[key] = value
+                with self.assertRaises(ValueError):
+                    self._load(data)
+
+    def test_config_rejects_string_boolean_instead_of_coercing_it_true(self):
+        data = self._base()
+        data["presentation"] = {"enabled": "false"}
+        with self.assertRaises(ValueError):
+            self._load(data)
+
+    def test_config_rejects_nonfinite_nested_provider_values(self):
+        data = self._base()
+        data["world_awareness"] = {
+            "enabled": True,
+            "weather": {"interval_seconds": "nan"},
+        }
+        with self.assertRaises(ValueError):
+            self._load(data)
+
+    def test_operator_context_requires_provenance_for_enabled_site_anchor(self):
+        data = self._base()
+        data["operator_context"] = {
+            "site_anchor": {
+                "enabled": True,
+                "latitude": 35.1,
+                "longitude": -80.6,
+            }
+        }
+        with self.assertRaises(ValueError):
+            self._load(data)
+
+    def test_operator_context_requires_timezone_aware_verification_time(self):
+        data = self._base()
+        data["operator_context"] = {
+            "site_anchor": {
+                "enabled": True,
+                "address": "Test",
+                "latitude": 35.1,
+                "longitude": -80.6,
+                "source_lineage": "test",
+                "source_record_id": "1",
+                "source_verified_at": "2026-08-13T12:00:00",
+                "source_artifact_sha256": "a" * 64,
+            }
+        }
+        with self.assertRaises(ValueError):
+            self._load(data)
+
+    def test_nested_config_collections_reject_wrong_json_shapes(self):
+        from personal_cic.core.config import WorldAwarenessConfig
+
+        invalid = (
+            {"surface": {"station_ids": "KEQY"}},
+            {"traffic": {"scope_counties": "Union"}},
+            {"traffic": {"tomtom": {"flow_probes": {"probe_id": "x"}}}},
+        )
+        for mapping in invalid:
+            with self.subTest(mapping=mapping):
+                with self.assertRaises(ValueError):
+                    WorldAwarenessConfig.from_mapping(mapping)
+
+    def test_runtime_root_null_is_rejected_as_config_error(self):
+        with self.assertRaisesRegex(ValueError, "runtime must be a JSON object"):
+            self._load(None)
+
+    def test_config_rejects_non_string_identity_and_provenance_fields(self):
+        cases = []
+        data = self._base()
+        data["world_awareness"] = {"location": {"label": None}}
+        cases.append(data)
+
+        data = self._base()
+        data["operator_context"] = {
+            "site_anchor": {
+                "enabled": True,
+                "label": "CIC SITE",
+                "address": None,
+                "latitude": 35.1,
+                "longitude": -80.6,
+                "source_lineage": "test",
+                "source_record_id": "1",
+                "source_verified_at": "2026-08-13T12:00:00Z",
+                "source_artifact_sha256": "a" * 64,
+            }
+        }
+        cases.append(data)
+
+        for data in cases:
+            with self.subTest(data=data):
+                with self.assertRaises(ValueError):
+                    self._load(data)
+
+    def test_tomtom_flow_probe_rejects_non_string_identity(self):
+        from personal_cic.core.config import TrafficFlowProbeConfig
+
+        with self.assertRaises(ValueError):
+            TrafficFlowProbeConfig.from_mapping(
+                {"probe_id": None, "label": "x", "latitude": 35.0, "longitude": -80.0}
+            )
+
 
 
 if __name__ == "__main__":

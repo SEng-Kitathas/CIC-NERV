@@ -12,6 +12,9 @@ from personal_cic.adapters.world import (
     DriveNCEventsAdapter,
     DriveNCMessageSignsAdapter,
     DriveNCWZDxAdapter,
+    FlowProbeSpec,
+    TomTomFlowAdapter,
+    TomTomIncidentsAdapter,
 )
 from personal_cic.bootstrap import RuntimeContext, ingest_observation_batch
 from personal_cic.core.config import TrafficConfig
@@ -21,6 +24,7 @@ from personal_cic.core.world.components import (
     TrafficCameraCollectionState,
     TrafficEventCollectionState,
     TrafficEventKernel,
+    TrafficFlowCollectionState,
     TrafficMessageSignCollectionState,
     TrafficSituationState,
 )
@@ -30,6 +34,8 @@ DRIVENC_EVENTS_ENTITY_ID = "local-traffic-drivenc-events"
 WZDX_ENTITY_ID = "local-traffic-wzdx"
 CMPD_ENTITY_ID = "local-traffic-cmpd-cad"
 CHARLOTTE_CLOSURES_ENTITY_ID = "local-traffic-charlotte-closures"
+TOMTOM_INCIDENTS_ENTITY_ID = "local-traffic-tomtom-incidents"
+TOMTOM_FLOW_ENTITY_ID = "local-traffic-tomtom-flow"
 CAMERAS_ENTITY_ID = "local-traffic-drivenc-cameras"
 SIGNS_ENTITY_ID = "local-traffic-drivenc-signs"
 SITUATION_ENTITY_ID = "local-traffic-situation"
@@ -40,6 +46,7 @@ _EVENT_ENTITIES = (
     WZDX_ENTITY_ID,
     CMPD_ENTITY_ID,
     CHARLOTTE_CLOSURES_ENTITY_ID,
+    TOMTOM_INCIDENTS_ENTITY_ID,
 )
 
 
@@ -66,6 +73,8 @@ def derive_traffic_situation(
     cameras_observation: ObservationState | None,
     signs: TrafficMessageSignCollectionState | None,
     signs_observation: ObservationState | None,
+    flow: TrafficFlowCollectionState | None = None,
+    flow_observation: ObservationState | None = None,
     configured_unavailable: tuple[str, ...],
     external_waze_visual_enabled: bool = True,
     external_waze_zoom: int = 11,
@@ -75,8 +84,9 @@ def derive_traffic_situation(
     ]
     usable_cameras = cameras if cameras is not None and _usable(cameras_observation) else None
     usable_signs = signs if signs is not None and _usable(signs_observation) else None
+    usable_flow = flow if flow is not None and _usable(flow_observation) else None
 
-    if not usable_event_sources and usable_cameras is None and usable_signs is None:
+    if not usable_event_sources and usable_cameras is None and usable_signs is None and usable_flow is None:
         return None
 
     grouped: dict[tuple[str, ...], list] = {}
@@ -144,6 +154,8 @@ def derive_traffic_situation(
         current_families.add(usable_cameras.source_family)
     if usable_signs is not None:
         current_families.add(usable_signs.source_family)
+    if usable_flow is not None:
+        current_families.add(usable_flow.source_family)
 
     source_observation_count = sum(
         state.local_record_count for state in usable_event_sources
@@ -152,11 +164,14 @@ def derive_traffic_situation(
         source_observation_count += usable_cameras.local_record_count
     if usable_signs is not None:
         source_observation_count += usable_signs.local_record_count
+    if usable_flow is not None:
+        source_observation_count += usable_flow.successful_probe_count
 
     collection_gaps = [
         "Waze crowdsourced incidents/police/hazards are not yet available through a supported normalized machine feed; optional Live Map remains external visual evidence",
-        "commercial independent traffic-flow/ETA lineages are not yet configured in RC1",
+        "TomTom flow is currently a sparse nearest-segment probe set, not continuous network coverage or route ETA",
         "CMPD CAD locations remain address-only until a lawful geocoding seam is added",
+        "cross-lineage event agreement is visible but source independence/event equivalence is not yet inferred",
     ]
     collection_gaps.extend(configured_unavailable)
 
@@ -171,6 +186,7 @@ def derive_traffic_situation(
         full_closure_count=full_closures,
         camera_count=0 if usable_cameras is None else usable_cameras.local_record_count,
         active_message_sign_count=0 if usable_signs is None else usable_signs.active_message_count,
+        flow_probe_count=0 if usable_flow is None else usable_flow.successful_probe_count,
         current_source_families=tuple(sorted(current_families)),
         collection_gaps=tuple(collection_gaps),
         correlation_mode=(
@@ -236,6 +252,20 @@ class TrafficAwarenessWorker:
             timeout_seconds=config.drivenc.timeout_seconds,
             scope_counties=config.scope_counties,
         )
+        self.tomtom_incidents_adapter = TomTomIncidentsAdapter(
+            **common,
+            api_key_env=config.tomtom.api_key_env,
+            timeout_seconds=config.tomtom.timeout_seconds,
+        )
+        self.tomtom_flow_adapter = TomTomFlowAdapter(
+            **common,
+            api_key_env=config.tomtom.api_key_env,
+            timeout_seconds=config.tomtom.timeout_seconds,
+            probes=tuple(
+                FlowProbeSpec(probe.probe_id, probe.label, probe.latitude, probe.longitude)
+                for probe in config.tomtom.flow_probes
+            ),
+        )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -245,6 +275,8 @@ class TrafficAwarenessWorker:
             WZDX_ENTITY_ID: "DriveNC WZDx Work Zones",
             CMPD_ENTITY_ID: "CMPD Traffic CAD",
             CHARLOTTE_CLOSURES_ENTITY_ID: "Charlotte Street Closures",
+            TOMTOM_INCIDENTS_ENTITY_ID: "TomTom Traffic Incidents",
+            TOMTOM_FLOW_ENTITY_ID: "TomTom Flow Probes",
             CAMERAS_ENTITY_ID: "DriveNC Traffic Cameras",
             SIGNS_ENTITY_ID: "DriveNC Message Signs",
             SITUATION_ENTITY_ID: "Local Traffic Situation",
@@ -275,6 +307,9 @@ class TrafficAwarenessWorker:
             self._withdraw(CMPD_ENTITY_ID, self.cmpd_adapter.ADAPTER_ID, "awaiting fresh CMPD traffic-CAD observation")
         if self.config.charlotte_closures.enabled:
             self._withdraw(CHARLOTTE_CLOSURES_ENTITY_ID, self.charlotte_adapter.ADAPTER_ID, "awaiting fresh Charlotte street-closure observation")
+        if self.config.tomtom.enabled:
+            self._withdraw(TOMTOM_INCIDENTS_ENTITY_ID, self.tomtom_incidents_adapter.ADAPTER_ID, "awaiting fresh TomTom incident observation")
+            self._withdraw(TOMTOM_FLOW_ENTITY_ID, self.tomtom_flow_adapter.ADAPTER_ID, "awaiting fresh TomTom flow observation")
         self._withdraw(SITUATION_ENTITY_ID, "traffic.fusion", "awaiting fresh traffic collection source")
 
     def start(self) -> None:
@@ -288,17 +323,29 @@ class TrafficAwarenessWorker:
         )
         self._thread.start()
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
+        """Request bounded shutdown and report whether the worker actually stopped.
+
+        TomTom incident collection may perform several bounded requests in one
+        collection pass. The join budget therefore cannot be treated as proof of
+        thread termination. A still-live worker remains explicitly represented.
+        """
         self._stop.set()
-        if self._thread is not None:
-            timeout = max(
-                self.config.drivenc.timeout_seconds,
-                self.config.wzdx.timeout_seconds,
-                self.config.cmpd.timeout_seconds,
-                self.config.charlotte_closures.timeout_seconds,
-            ) + 4.0
-            self._thread.join(timeout=timeout)
-        self._thread = None
+        thread = self._thread
+        if thread is None:
+            return True
+        timeout = max(
+            self.config.drivenc.timeout_seconds,
+            self.config.wzdx.timeout_seconds,
+            self.config.cmpd.timeout_seconds,
+            self.config.charlotte_closures.timeout_seconds,
+            self.config.tomtom.timeout_seconds,
+        ) + 4.0
+        thread.join(timeout=timeout)
+        stopped = not thread.is_alive()
+        if stopped:
+            self._thread = None
+        return stopped
 
     def _source(self, entity_id: str, component_type: type):
         state = self.context.world.get_component(entity_id, component_type)
@@ -313,6 +360,7 @@ class TrafficAwarenessWorker:
             (self.config.wzdx.enabled, WZDX_ENTITY_ID, "DriveNC WZDx"),
             (self.config.cmpd.enabled, CMPD_ENTITY_ID, "CMPD traffic CAD"),
             (self.config.charlotte_closures.enabled, CHARLOTTE_CLOSURES_ENTITY_ID, "Charlotte street closures"),
+            (self.config.tomtom.enabled, TOMTOM_INCIDENTS_ENTITY_ID, "TomTom incidents"),
         )
         for enabled, entity_id, label in source_specs:
             if not enabled:
@@ -325,11 +373,14 @@ class TrafficAwarenessWorker:
 
         cameras, cameras_obs = self._source(CAMERAS_ENTITY_ID, TrafficCameraCollectionState)
         signs, signs_obs = self._source(SIGNS_ENTITY_ID, TrafficMessageSignCollectionState)
+        flow, flow_obs = self._source(TOMTOM_FLOW_ENTITY_ID, TrafficFlowCollectionState)
         if self.config.drivenc.enabled:
             if cameras_obs is None or cameras_obs.availability is ObservationAvailability.UNAVAILABLE:
                 configured.append("configured source unavailable: DriveNC cameras")
             if signs_obs is None or signs_obs.availability is ObservationAvailability.UNAVAILABLE:
                 configured.append("configured source unavailable: DriveNC message signs")
+        if self.config.tomtom.enabled and (flow_obs is None or flow_obs.availability is ObservationAvailability.UNAVAILABLE):
+            configured.append("configured source unavailable: TomTom flow")
 
         situation = derive_traffic_situation(
             location_label=self.location_label,
@@ -341,6 +392,8 @@ class TrafficAwarenessWorker:
             cameras_observation=cameras_obs,
             signs=signs,
             signs_observation=signs_obs,
+            flow=flow,
+            flow_observation=flow_obs,
             configured_unavailable=tuple(configured),
             external_waze_visual_enabled=self.config.external_waze_visual_enabled,
             external_waze_zoom=self.config.external_waze_zoom,
@@ -356,6 +409,8 @@ class TrafficAwarenessWorker:
             cameras_obs is not None and cameras_obs.availability is ObservationAvailability.DEGRADED
         ) or (
             signs_obs is not None and signs_obs.availability is ObservationAvailability.DEGRADED
+        ) or (
+            flow_obs is not None and flow_obs.availability is ObservationAvailability.DEGRADED
         ):
             observations = (
                 Observation.partial(
@@ -393,6 +448,8 @@ class TrafficAwarenessWorker:
             "cmpd": 0.0,
             "wzdx": 0.0,
             "charlotte": 0.0,
+            "tomtom_incidents": 0.0,
+            "tomtom_flow": 0.0,
         }
         intervals = {
             "events": self.config.drivenc.events_interval_seconds,
@@ -401,6 +458,8 @@ class TrafficAwarenessWorker:
             "cmpd": self.config.cmpd.interval_seconds,
             "wzdx": self.config.wzdx.interval_seconds,
             "charlotte": self.config.charlotte_closures.interval_seconds,
+            "tomtom_incidents": self.config.tomtom.incidents_interval_seconds,
+            "tomtom_flow": self.config.tomtom.flow_interval_seconds,
         }
         enabled = {
             "events": self.config.drivenc.enabled,
@@ -409,6 +468,8 @@ class TrafficAwarenessWorker:
             "cmpd": self.config.cmpd.enabled,
             "wzdx": self.config.wzdx.enabled,
             "charlotte": self.config.charlotte_closures.enabled,
+            "tomtom_incidents": self.config.tomtom.enabled,
+            "tomtom_flow": self.config.tomtom.enabled,
         }
         collectors = {
             "events": (DRIVENC_EVENTS_ENTITY_ID, self.drivenc_events_adapter),
@@ -417,10 +478,15 @@ class TrafficAwarenessWorker:
             "cmpd": (CMPD_ENTITY_ID, self.cmpd_adapter),
             "wzdx": (WZDX_ENTITY_ID, self.wzdx_adapter),
             "charlotte": (CHARLOTTE_CLOSURES_ENTITY_ID, self.charlotte_adapter),
+            "tomtom_incidents": (TOMTOM_INCIDENTS_ENTITY_ID, self.tomtom_incidents_adapter),
+            "tomtom_flow": (TOMTOM_FLOW_ENTITY_ID, self.tomtom_flow_adapter),
         }
         # Fast-changing event/sign/CAD state is attempted first; slower work-zone
         # and municipal context follows. All remain independently observable.
-        order = ("events", "signs", "cmpd", "cameras", "wzdx", "charlotte")
+        order = (
+            "events", "signs", "cmpd", "tomtom_flow", "cameras",
+            "wzdx", "charlotte", "tomtom_incidents",
+        )
 
         while not self._stop.is_set():
             now = time.monotonic()

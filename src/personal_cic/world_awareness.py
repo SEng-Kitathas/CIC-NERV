@@ -152,19 +152,30 @@ class WorldAwarenessWorker:
         self._thread = threading.Thread(target=self._run, name="personal-cic-world-awareness", daemon=True)
         self._thread.start()
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
+        """Request bounded shutdown and report whether the worker actually stopped.
+
+        A timeout is not success. Keep the live thread reference when a provider
+        call outlives the join budget so runtime shutdown can avoid claiming a
+        race-free final snapshot.
+        """
         self._stop.set()
-        if self._thread is not None:
-            timeout = max(
-                self.config.weather.timeout_seconds,
-                self.config.alerts.timeout_seconds,
-                self.config.surface.timeout_seconds,
-                self.config.forecast.timeout_seconds * 2,
-                self.config.radar.timeout_seconds * 4,
-                self.config.radar.context_timeout_seconds * 2,
-            ) + 2.0
-            self._thread.join(timeout=timeout)
-        self._thread = None
+        thread = self._thread
+        if thread is None:
+            return True
+        timeout = max(
+            self.config.weather.timeout_seconds,
+            self.config.alerts.timeout_seconds,
+            self.config.surface.timeout_seconds,
+            self.config.forecast.timeout_seconds * 2,
+            self.config.radar.timeout_seconds * 4,
+            self.config.radar.context_timeout_seconds * 2,
+        ) + 2.0
+        thread.join(timeout=timeout)
+        stopped = not thread.is_alive()
+        if stopped:
+            self._thread = None
+        return stopped
 
     def _recompute_estimate(self) -> None:
         surface = self.context.world.get_component(SURFACE_ENTITY_ID, SurfaceObservationNetworkState)

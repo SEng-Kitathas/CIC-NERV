@@ -32,7 +32,7 @@ The one-shot cognition cycle becomes a persistent process:
 5. HealthSystem derives normalized `HealthState`.
 6. Every typed event is appended to `logs/events.jsonl`.
 7. WorldState is atomically embodied to `state/world.json`.
-8. SIGINT/SIGTERM cause a final snapshot and `RuntimeStopping`.
+8. SIGINT/SIGTERM request bounded worker shutdown; a final snapshot is written only after state-mutating workers actually quiesce, then `RuntimeStopping` records the outcome.
 9. systemd owns process resurrection; runtime code does not reinvent supervision.
 
 ## Runtime ownership
@@ -160,3 +160,97 @@ RC1 permits only one event-equivalence rule: same source family plus the same up
 Traffic reuses the established Observation Integrity and re-entry laws. A successful empty source is current negative evidence; retrieval or schema failure is unavailable observation; persisted traffic values remain historical through restart until fresh source success re-earns authority. Traffic has no inherited METAR-style retained-authority policy.
 
 The `/traffic` browser remains a read-only WorldState projection. TIGERweb radar-context geometry may be reused as separately sourced reference context, but it acquires no traffic authority. Waze Live Map is an explicit exception only as operator-triggered external visual evidence: browser direct, noncanonical, and never counted as normalized corroboration in RC1.
+
+## 0.3.6 / Slice 003f — current architectural state
+
+Slice 003f remains open. The promoted floor is RC1B; later RC2/RC2A/RC2B-R1/RC2C/RC2D/RC2D-R1/RC2D-R2 work remains candidate lineage until an exact target promotion gate earns a new floor.
+
+The current architecture is intentionally hybrid rather than a single universal store:
+
+```text
+ECS-like typed current state
++ holonic ownership/boundaries
++ typed event history
++ source-preserving domain collections
++ derived situation state
++ specialized raster/vector/cache artifacts
+        ↓
+semantic contracts over one modeled world
+        ↓
+read-only Personal CIC projection
+```
+
+This preserves the original `entity → components → world state → typed event → system → intent`
+shape while allowing richer evidence, provenance, and future semantic-graph relationships without
+turning `WorldState` into a semantic god-object.
+
+### Recursive heterogeneous fusion rule
+
+Traffic is the first multi-lineage domain to make the general fusion requirement concrete.
+Normalization makes records mutually intelligible but does not erase source lineage. Fusion may
+produce agreement, disagreement, association, an unresolved hypothesis, or refusal to fuse. A
+derived product remains derived and must retain enough provenance to unwind back to contributing
+source records.
+
+### Location semantics
+
+Three location concepts are now separate:
+
+```text
+collection_scope_center
+    regional acquisition geometry / awareness center
+
+fixed_site_anchor
+    source-provenanced location of the fixed CIC node/site
+
+live_operator_position
+    future mobile/live estimate; currently unimplemented / null
+```
+
+The traffic collection domain remains centered on the configured awareness location. RC2D-R2
+adds the fixed site anchor without reinterpreting it as a live operator position.
+
+### Presentation sovereignty / execution boundary
+
+The browser has no world authority, but it participates in execution. Current presentation has
+four separable authorities:
+
+```text
+WORLD AUTHORITY       WorldState / domain semantics
+PROJECTION AUTHORITY  CIC read-only projection
+EXECUTION AUTHORITY   browser + JS + WebGL / MapLibre runtime
+RESOURCE AUTHORITY    assets/providers required for rendering
+```
+
+Therefore server reachability is not browser-integration proof, projection correctness is not
+rendering proof, and rendering success is not operator acceptance. MapLibre is served locally and
+pinned as a presentation dependency; OSM raster tiles remain browser-direct reference context in
+this candidate and possess no WorldState authority. The long-term map direction is a more sovereign
+local geo substrate, not a dependency that owns whether CIC can render.
+
+### Concurrency and shutdown integrity
+
+Local collection, world-awareness collection, traffic collection, and presentation are concurrent.
+The event bus snapshots subscriber registries under a lock but invokes callbacks outside that lock;
+this preserves recursive publish behavior without imposing a bus/world lock-order deadlock. Durable
+JSONL appends are serialized so concurrent publishers cannot interleave records.
+
+Remote worker `stop()` is a proposition, not a command receipt: it returns whether the thread
+actually terminated. A timeout leaves the live thread represented. Runtime shutdown does not force
+a final snapshot if a state-mutating worker has failed to quiesce.
+
+### Snapshot schema governance
+
+The current writer remains schema version 2 because that is the verified target lineage. The reader
+explicitly admits historical versions 1, 2, and the radar-era version 3 fixture required by the
+verified lineage; unknown future versions are rejected rather than guessed. This is a compatibility
+policy, not a claim that explicit migration functions are complete.
+
+### Dependency / source-distribution boundary
+
+Critical presentation-runtime dependency identity lives in a machine-readable lock. Authored source
+and third-party runtime bytes are separate configuration-controlled artifacts. A fresh map-capable
+service install must verify that the pinned MapLibre runtime is materialized before starting.
+Compatibility ranges in `pyproject.toml` and exact observed target dependency pins are separate
+claims; see `requirements-target.lock` and `docs/SOURCE_DISTRIBUTION.md`.
+

@@ -38,6 +38,8 @@ from .components import (
     TrafficCameraCollectionState,
     TrafficMessageSignObservation,
     TrafficMessageSignCollectionState,
+    TrafficFlowProbeObservation,
+    TrafficFlowCollectionState,
     TrafficEventKernel,
     TrafficSituationState,
 )
@@ -71,6 +73,7 @@ COMPONENT_TYPES = {
         TrafficEventCollectionState,
         TrafficCameraCollectionState,
         TrafficMessageSignCollectionState,
+        TrafficFlowCollectionState,
         TrafficSituationState,
     )
 }
@@ -151,6 +154,9 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
                 for point in event_values.get("geometry", [])
                 if isinstance(point, dict)
             )
+            event_values["road_numbers"] = tuple(event_values.get("road_numbers", []))
+            event_values["event_details"] = tuple(event_values.get("event_details", []))
+            event_values["event_codes"] = tuple(event_values.get("event_codes", []))
             events.append(TrafficEventObservation(**event_values))
         values["events"] = tuple(events)
     elif component_type is TrafficCameraCollectionState:
@@ -168,6 +174,19 @@ def decode_component(name: str, payload: dict[str, Any]) -> object | None:
             sign_values["messages"] = tuple(sign_values.get("messages", []))
             signs.append(TrafficMessageSignObservation(**sign_values))
         values["signs"] = tuple(signs)
+    elif component_type is TrafficFlowCollectionState:
+        probes = []
+        for item in values.get("probes", []):
+            if not isinstance(item, dict):
+                continue
+            probe_values = dict(item)
+            probe_values["geometry"] = tuple(
+                GeoPoint(**point)
+                for point in probe_values.get("geometry", [])
+                if isinstance(point, dict)
+            )
+            probes.append(TrafficFlowProbeObservation(**probe_values))
+        values["probes"] = tuple(probes)
     elif component_type is TrafficSituationState:
         values["current_source_families"] = tuple(values.get("current_source_families", []))
         values["collection_gaps"] = tuple(values.get("collection_gaps", []))

@@ -1,3 +1,61 @@
+# 0.3.6 / 003f RC2D-R2-QA1-R2 — Service-installer verifier-scope propagation
+
+- Corrects `tools/install-user-service.sh` to verify the embodied checkout with
+  `--working-tree --require-runtime-vendor` rather than accidentally re-entering strict
+  source-capture mode after QA1-R1 had already established the distinction.
+- Corrects the service-install refusal diagnostic so any working-tree/dependency
+  verification failure is not falsely reported as missing MapLibre materialization.
+- Adds regression coverage proving the service installer propagates the required
+  working-tree scope and pinned-runtime requirement together.
+- No `src/personal_cic/` runtime, world-state, traffic, weather/radar, map-camera,
+  site-anchor, source-authority, persistence, or HMI behavior changes from QA1-R1.
+
+# 0.3.6 / 003f RC2D-R2-QA1-R1 — Verification-scope correction
+
+- Separates sealed source-capture hygiene from embodied working-tree cleanliness.
+- Excludes local runtime/tool roots such as `.venv/` from source-distribution authority.
+- Adds explicit `--working-tree` verification for target checkouts containing expected caches/build metadata.
+- Keeps strict source-capture verification for sealed artifacts and adds regression coverage proving the distinction.
+- No world-state, traffic, map-camera, site-anchor, source-authority, persistence, or operator-HMI semantic change from QA1.
+
+## 0.3.6 / 003f RC2D-R2-QA1 — quality-reconciled source candidate
+
+**Status:** offline candidate; not target-promoted. The promoted floor remains RC1B and Slice 003f remains open.
+
+- Preserves the RC2 traffic collection semantics, RC2A/RC2B-R1 operator-owned viewport work, RC2D MapLibre camera, RC2D-R1 browser referrer repair, and RC2D-R2 fixed-site-anchor separation.
+- Hardens configuration parsing: strict booleans, finite numeric values, positive core cadences, typed nested shapes, health threshold ordering/ranges, environment-variable names, and required source provenance for an enabled fixed site anchor.
+- Makes snapshot compatibility explicit: writer stays schema v2; reader admits the evidenced historical v1/v2/v3 lineage and rejects unknown future versions.
+- Makes worker shutdown honest: bounded stop reports actual quiescence; runtime skips a forced final snapshot if a state-mutating worker remains live.
+- Serializes concurrent event-journal appends and protects EventBus subscriber/count state without holding the bus lock across callbacks.
+- Adds a machine-readable MapLibre dependency lock, exact-hash materializer, source-distribution verifier, package-data declaration, target Python dependency lock, and service-install refusal when required map runtime bytes are absent.
+- Adds modest user-service hardening (`NoNewPrivileges=true`, `UMask=0077`) without introducing filesystem restrictions that have not been target-proved.
+- Corrects the legacy TomTom `cic-center` probe display label to `collection-scope center reference` while retaining the stable probe ID for continuity.
+- Reconciles current architecture/presentation/traffic/conformance documentation and records remaining debt rather than refactoring unrelated code for style.
+- Adds a reproducible source-local quality gate for syntax/static invariants, JSON/shell integrity, source-distribution checks, and the full regression suite; it explicitly carries no promotion authority.
+- Expands regression coverage; no inherited test is intentionally removed.
+
+### Candidate chronology retained
+
+- RC2: TomTom commercial incidents + sparse flow.
+- RC2A: geographic viewport.
+- RC2B/R1: sticky operator-owned viewport and operational presentation; R1 corrected an artifact whitespace failure.
+- RC2C: detailed OSM reference map; target use exposed wheel chaining/aspect distortion and forced camera-substrate replacement.
+- RC2D: MapLibre geographic camera; target use exposed browser referrer/resource-contract failure.
+- RC2D-R1: referrer contract repair and successful operator map interaction.
+- RC2D-R2: fixed CIC site anchor separated from collection center and future live operator location.
+
+## 0.3.6 RC2 candidate — TomTom commercial incidents + sparse flow
+
+- Adds TomTom Orbis Incident Details as a source-preserving `commercial_report` lineage with provider event identity, geometry, category/detail, delay, length, probability, time-validity, and lifecycle fields.
+- Preserves TomTom end-user report count/time as provider community attribution without relabeling the event as a crowd report or assuming the attribution is current.
+- Keeps TomTom `roadClosed` as source category evidence rather than silently promoting it into CIC's stronger normalized `full_closure` proposition.
+- Adds TomTom Flow Segment Data as separately typed `commercial_modeled_telemetry` with query-reference identity, matched geometry/OpenLR, functional road class, current/free-flow speed and travel time, confidence, and closure state.
+- Makes nearest-road-fragment semantics explicit: configured query labels do not assert roadway identity.
+- Adds flow materiality bands so ordinary speed churn stays sample telemetry while matched-segment, closure, and operational congestion-band changes are material.
+- Extends traffic snapshot hydration, re-entry authority withdrawal, source health, collection gaps, API projection, and map controls for TomTom incidents/flow.
+- Bumps the traffic projection schema to API version 2 while retaining the `/api/v1/traffic` endpoint path.
+- Keeps Waze normalized crowd telemetry, independent commercial corroboration/route ETA, CMPD geocoding, and cross-lineage event equivalence explicitly open; Slice 003f remains unfinished.
+
 ## 0.3.6 RC1 — Slice 003f Multi-Source Traffic Substrate
 
 - Adds source-preserving traffic collection for DriveNC events, DriveNC WZDx work zones, CMPD live traffic CAD, Charlotte street closures, DriveNC cameras, and DriveNC message signs.

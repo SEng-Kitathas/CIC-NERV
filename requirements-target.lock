@@ -1,0 +1,3 @@
+# Personal CIC direct Python dependency lock for the currently verified target environment.
+# This is not an OS/browser/systemd lock and does not replace pyproject compatibility bounds.
+psutil==7.2.2

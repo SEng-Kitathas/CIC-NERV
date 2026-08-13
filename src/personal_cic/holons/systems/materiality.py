@@ -22,6 +22,7 @@ from personal_cic.core.world.components import (
     TrafficEventCollectionState,
     TrafficCameraCollectionState,
     TrafficMessageSignCollectionState,
+    TrafficFlowCollectionState,
     TrafficSituationState,
 )
 
@@ -279,6 +280,20 @@ def telemetry_significance(
                     event.full_closure,
                     event.lanes_affected,
                     event.major_event,
+                    event.start_at,
+                    event.end_at,
+                    event.magnitude_of_delay,
+                    event.delay_seconds,
+                    event.length_meters,
+                    event.road_numbers,
+                    event.from_location,
+                    event.to_location,
+                    event.probability_of_occurrence,
+                    event.time_validity,
+                    event.event_details,
+                    event.event_codes,
+                    event.community_report_count,
+                    event.community_last_report_at,
                     geometry,
                 ))
             return (
@@ -314,12 +329,47 @@ def telemetry_significance(
             )
         return "material" if sign_signature(previous) != sign_signature(current) else "sample"
 
+    if isinstance(current, TrafficFlowCollectionState) and isinstance(previous, TrafficFlowCollectionState):
+        def relative_band(probe):
+            if probe.road_closure is True:
+                return "closed"
+            current_speed = probe.current_speed_mph
+            free_speed = probe.free_flow_speed_mph
+            if current_speed is None or free_speed is None or free_speed <= 0:
+                return "unknown"
+            ratio = current_speed / free_speed
+            if ratio >= 0.85:
+                return "free"
+            if ratio >= 0.65:
+                return "slowed"
+            if ratio >= 0.40:
+                return "congested"
+            return "severe"
+
+        def flow_signature(state):
+            return (
+                state.provider,
+                state.source_family,
+                tuple(
+                    (
+                        probe.probe_id,
+                        probe.openlr,
+                        probe.functional_road_class,
+                        probe.road_closure,
+                        relative_band(probe),
+                    )
+                    for probe in state.probes
+                ),
+            )
+        return "material" if flow_signature(previous) != flow_signature(current) else "sample"
+
     if isinstance(current, TrafficSituationState) and isinstance(previous, TrafficSituationState):
         old = (
             previous.event_kernel_count,
             previous.full_closure_count,
             previous.camera_count,
             previous.active_message_sign_count,
+            previous.flow_probe_count,
             previous.current_source_families,
             previous.collection_gaps,
             tuple((kernel.kernel_id, kernel.source_families, kernel.source_record_refs) for kernel in previous.kernels),
@@ -329,6 +379,7 @@ def telemetry_significance(
             current.full_closure_count,
             current.camera_count,
             current.active_message_sign_count,
+            current.flow_probe_count,
             current.current_source_families,
             current.collection_gaps,
             tuple((kernel.kernel_id, kernel.source_families, kernel.source_record_refs) for kernel in current.kernels),

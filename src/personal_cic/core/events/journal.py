@@ -2,6 +2,7 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
 import json
+from threading import Lock
 from typing import Any
 
 from .model import ComponentUpdated, ObservationCycleCompleted
@@ -13,6 +14,7 @@ class EventJournal:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._write_lock = Lock()
 
     @staticmethod
     def _jsonable(value: Any) -> Any:
@@ -44,5 +46,9 @@ class EventJournal:
             "event_type": type(event).__name__,
             "payload": self._jsonable(event),
         }
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+        line = json.dumps(record, separators=(",", ":")) + "\n"
+        # Remote-awareness and local collection run on separate threads. Serialize
+        # each durable append so one JSONL record remains one atomic journal line.
+        with self._write_lock:
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(line)

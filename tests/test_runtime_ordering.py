@@ -60,6 +60,7 @@ class RuntimeOrderingTests(unittest.TestCase):
 
                 def stop(self_inner):
                     calls.append("world-stop")
+                    return True
 
             runtime.presentation = FakePresentation()
             runtime.world_awareness = FakeAwareness()
@@ -73,6 +74,52 @@ class RuntimeOrderingTests(unittest.TestCase):
                 calls.index("presentation-start"),
                 calls.index("world-start"),
             )
+    def test_incomplete_remote_worker_shutdown_skips_forced_final_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            runtime_config = tmp / "runtime.json"
+            state_path = tmp / "world.json"
+            journal_path = tmp / "events.jsonl"
+            runtime_config.write_text(
+                json.dumps(
+                    {
+                        "collection_interval_seconds": 5,
+                        "snapshot_interval_seconds": 5,
+                        "state_path": str(state_path),
+                        "event_journal_path": str(journal_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            runtime = PersistentRuntime(
+                runtime_config_path=runtime_config,
+                health_config_path=Path("config/health.json"),
+            )
+
+            class StuckAwareness:
+                def prepare_reentry(self_inner):
+                    return None
+
+                def start(self_inner):
+                    runtime.request_stop("test")
+
+                def stop(self_inner):
+                    return False
+
+            runtime.world_awareness = StuckAwareness()
+            runtime.run()
+
+            self.assertFalse(state_path.exists())
+            records = [
+                json.loads(line)
+                for line in journal_path.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(records[-1]["event_type"], "RuntimeStopping")
+            self.assertIn(
+                "incomplete worker shutdown: world-awareness",
+                records[-1]["payload"]["reason"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

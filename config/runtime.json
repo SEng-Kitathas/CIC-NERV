@@ -92,7 +92,72 @@
         "timeout_seconds": 8.0
       },
       "external_waze_visual_enabled": true,
-      "external_waze_zoom": 11
+      "external_waze_zoom": 11,
+      "tomtom": {
+        "enabled": true,
+        "incidents_interval_seconds": 14400.0,
+        "flow_interval_seconds": 1200.0,
+        "timeout_seconds": 8.0,
+        "api_key_env": "TOMTOM_API_KEY",
+        "flow_probes": [
+          {
+            "probe_id": "cic-center",
+            "label": "collection-scope center reference",
+            "latitude": 35.1115,
+            "longitude": -80.6099
+          },
+          {
+            "probe_id": "us74-union-west-ref",
+            "label": "US-74 Union west reference",
+            "latitude": 35.099,
+            "longitude": -80.67671
+          },
+          {
+            "probe_id": "us74-bypass-ref",
+            "label": "US-74 Bypass reference",
+            "latitude": 35.04747,
+            "longitude": -80.57052
+          },
+          {
+            "probe_id": "i485-southwest-ref",
+            "label": "I-485 southwest reference",
+            "latitude": 35.14671,
+            "longitude": -80.93992
+          },
+          {
+            "probe_id": "i485-west-ref",
+            "label": "I-485 west reference",
+            "latitude": 35.20945,
+            "longitude": -80.96827
+          },
+          {
+            "probe_id": "i85-charlotte-ref",
+            "label": "I-85 Charlotte reference",
+            "latitude": 35.27831,
+            "longitude": -80.7967
+          },
+          {
+            "probe_id": "i277-uptown-ref",
+            "label": "I-277 Uptown reference",
+            "latitude": 35.22441,
+            "longitude": -80.85751
+          }
+        ]
+      }
+    }
+  },
+  "operator_context": {
+    "site_anchor": {
+      "enabled": true,
+      "label": "CIC SITE",
+      "address": "7004 Dacian Ln, Indian Trail, NC 28079",
+      "latitude": 35.12042277,
+      "longitude": -80.62950725,
+      "position_kind": "fixed_site_anchor",
+      "source_lineage": "Union County NC GIS Address_Point",
+      "source_record_id": "65294",
+      "source_verified_at": "2026-08-13T15:42:00Z",
+      "source_artifact_sha256": "5cfcd68382511b5639dab09355a8e26919b50bf83f3f5660fb891488dd674d4b"
     }
   }
 }

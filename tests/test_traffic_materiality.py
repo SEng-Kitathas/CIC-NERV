@@ -11,6 +11,8 @@ from personal_cic.core.world.components import (
     TrafficEventObservation,
     TrafficMessageSignCollectionState,
     TrafficMessageSignObservation,
+    TrafficFlowCollectionState,
+    TrafficFlowProbeObservation,
     TrafficSituationState,
 )
 from personal_cic.holons.systems.materiality import telemetry_significance
@@ -107,6 +109,64 @@ class TrafficMaterialityTests(unittest.TestCase):
         )
         old = TrafficMessageSignCollectionState(**base, active_message_count=0, signs=(s1,))
         new = TrafficMessageSignCollectionState(**base, active_message_count=1, signs=(s2,))
+        self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "material")
+
+
+    def test_flow_speed_churn_inside_same_semantic_band_is_sample(self):
+        def state(speed):
+            probe = TrafficFlowProbeObservation(
+                probe_id="x", label="query ref", source_family="TomTom Traffic",
+                provider="TomTom Flow Segment Data", collection_class="commercial_modeled_telemetry",
+                query_latitude=35.1, query_longitude=-80.6,
+                match_method="nearest_road_fragment_to_query_point",
+                functional_road_class="FRC1", current_speed_mph=speed, free_flow_speed_mph=60,
+                current_travel_time_seconds=60, free_flow_travel_time_seconds=55, confidence=1.0,
+                road_closure=False, openlr="same", geometry=(GeoPoint(35.1, -80.6), GeoPoint(35.11, -80.61)),
+            )
+            return TrafficFlowCollectionState(
+                location_label="Indian Trail", provider="TomTom Flow Segment Data",
+                source_family="TomTom Traffic", collection_class="commercial_modeled_telemetry",
+                scope_center_latitude=35.1115, scope_center_longitude=-80.6099, scope_radius_miles=75,
+                configured_probe_count=1, successful_probe_count=1, probes=(probe,),
+            )
+        self.assertEqual(telemetry_significance(state(58), state(55), THRESHOLDS), "sample")
+
+    def test_flow_crossing_congestion_band_is_material(self):
+        def state(speed):
+            probe = TrafficFlowProbeObservation(
+                probe_id="x", label="query ref", source_family="TomTom Traffic",
+                provider="TomTom Flow Segment Data", collection_class="commercial_modeled_telemetry",
+                query_latitude=35.1, query_longitude=-80.6,
+                match_method="nearest_road_fragment_to_query_point",
+                functional_road_class="FRC1", current_speed_mph=speed, free_flow_speed_mph=60,
+                current_travel_time_seconds=60, free_flow_travel_time_seconds=55, confidence=1.0,
+                road_closure=False, openlr="same", geometry=(GeoPoint(35.1, -80.6), GeoPoint(35.11, -80.61)),
+            )
+            return TrafficFlowCollectionState(
+                location_label="Indian Trail", provider="TomTom Flow Segment Data",
+                source_family="TomTom Traffic", collection_class="commercial_modeled_telemetry",
+                scope_center_latitude=35.1115, scope_center_longitude=-80.6099, scope_radius_miles=75,
+                configured_probe_count=1, successful_probe_count=1, probes=(probe,),
+            )
+        self.assertEqual(telemetry_significance(state(58), state(30), THRESHOLDS), "material")
+
+    def test_flow_matched_segment_identity_change_is_material(self):
+        probe = TrafficFlowProbeObservation(
+            probe_id="x", label="query ref", source_family="TomTom Traffic",
+            provider="TomTom Flow Segment Data", collection_class="commercial_modeled_telemetry",
+            query_latitude=35.1, query_longitude=-80.6,
+            match_method="nearest_road_fragment_to_query_point",
+            functional_road_class="FRC1", current_speed_mph=60, free_flow_speed_mph=60,
+            current_travel_time_seconds=60, free_flow_travel_time_seconds=60, confidence=1.0,
+            road_closure=False, openlr="segment-a", geometry=(GeoPoint(35.1, -80.6),),
+        )
+        base = dict(
+            location_label="Indian Trail", provider="TomTom Flow Segment Data", source_family="TomTom Traffic",
+            collection_class="commercial_modeled_telemetry", scope_center_latitude=35.1115,
+            scope_center_longitude=-80.6099, scope_radius_miles=75, configured_probe_count=1, successful_probe_count=1,
+        )
+        old = TrafficFlowCollectionState(**base, probes=(probe,))
+        new = TrafficFlowCollectionState(**base, probes=(replace(probe, openlr="segment-b"),))
         self.assertEqual(telemetry_significance(old, new, THRESHOLDS), "material")
 
     def test_situation_derived_timestamp_change_is_sample(self):

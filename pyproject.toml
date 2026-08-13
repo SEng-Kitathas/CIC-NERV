@@ -8,7 +8,7 @@ version = "0.3.6"
 description = "Holonic, ECS-inspired personal command environment"
 requires-python = ">=3.10"
 dependencies = [
-    "psutil>=5.9",
+    "psutil>=5.9,<8",
 ]
 
 [project.scripts]
@@ -17,3 +17,12 @@ cic-runtime = "personal_cic.runtime:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"personal_cic.presentation" = [
+    "vendor/maplibre/*.js",
+    "vendor/maplibre/*.css",
+    "vendor/maplibre/*.txt",
+    "vendor/maplibre/*.json",
+    "vendor/maplibre/*.md",
+]

@@ -44,6 +44,7 @@ class PersistentRuntime:
                 runtime_metadata=self._presentation_metadata,
                 event_journal_path=self.runtime_config.event_journal_path,
                 radar_cache_dir=self.runtime_config.world_awareness.radar.cache_dir,
+                site_anchor=self.runtime_config.operator_context.site_anchor,
             )
         if self.runtime_config.world_awareness.enabled:
             self.world_awareness = WorldAwarenessWorker(
@@ -122,14 +123,26 @@ class PersistentRuntime:
                 )
                 self.stop_event.wait(wait_for)
         finally:
-            if self.traffic_awareness is not None:
-                self.traffic_awareness.stop()
-            if self.world_awareness is not None:
-                self.world_awareness.stop()
+            incomplete_workers: list[str] = []
+            if self.traffic_awareness is not None and not self.traffic_awareness.stop():
+                incomplete_workers.append("traffic-awareness")
+            if self.world_awareness is not None and not self.world_awareness.stop():
+                incomplete_workers.append("world-awareness")
             if self.presentation is not None:
                 self.presentation.stop()
-            self._snapshot_if_due(force=True)
-            self.events.publish(RuntimeStopping(reason=self.stop_reason))
+
+            stopping_reason = self.stop_reason
+            if incomplete_workers:
+                stopping_reason = (
+                    f"{self.stop_reason}; incomplete worker shutdown: "
+                    + ", ".join(incomplete_workers)
+                )
+                # A remote worker can still mutate WorldState until the process
+                # exits. Skipping the forced snapshot is safer than persisting a
+                # state while falsely claiming graceful quiescence.
+            else:
+                self._snapshot_if_due(force=True)
+            self.events.publish(RuntimeStopping(reason=stopping_reason))
 
 
 def main() -> None:

@@ -12,6 +12,16 @@ if [[ ! -x "${RUNTIME}" ]]; then
     exit 1
 fi
 
+VERIFY_SOURCE="${PROJECT_ROOT}/tools/verify-source-distribution.py"
+if [[ ! -x "${VERIFY_SOURCE}" ]]; then
+    echo "Missing source-distribution verifier: ${VERIFY_SOURCE}" >&2
+    exit 1
+fi
+if ! "${PROJECT_ROOT}/.venv/bin/python" "${VERIFY_SOURCE}" --working-tree --require-runtime-vendor; then
+    echo "Refusing service install: working-tree/source dependency verification failed." >&2
+    exit 1
+fi
+
 mkdir -p "${SERVICE_DIR}"
 
 cat > "${SERVICE_FILE}" <<EOF
@@ -28,6 +38,8 @@ Restart=on-failure
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-${HOME}/.config/personal-cic/secrets.env
+NoNewPrivileges=true
+UMask=0077
 
 [Install]
 WantedBy=default.target

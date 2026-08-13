@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import statistics
 from typing import Any
 
+from personal_cic.core.config import SiteAnchorConfig
 from personal_cic.core.world import WorldState
 
 
@@ -400,7 +401,11 @@ def build_world_projection(world: WorldState, *, feed: list[dict] | None = None)
     }
 
 
-def build_traffic_projection(world: WorldState) -> dict[str, Any]:
+def build_traffic_projection(
+    world: WorldState,
+    *,
+    site_anchor: SiteAnchorConfig | None = None,
+) -> dict[str, Any]:
     """Project source-preserving local traffic state for an operator map.
 
     The projection deliberately keeps each provider observation separate. Event
@@ -430,13 +435,15 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
         "wzdx": "local-traffic-wzdx",
         "cmpd": "local-traffic-cmpd-cad",
         "charlotte_closures": "local-traffic-charlotte-closures",
+        "tomtom_incidents": "local-traffic-tomtom-incidents",
+        "tomtom_flow": "local-traffic-tomtom-flow",
         "cameras": "local-traffic-drivenc-cameras",
         "message_signs": "local-traffic-drivenc-signs",
     }
 
     event_sources: dict[str, dict[str, Any]] = {}
     flat_events: list[dict[str, Any]] = []
-    for key in ("drivenc_events", "wzdx", "cmpd", "charlotte_closures"):
+    for key in ("drivenc_events", "wzdx", "cmpd", "charlotte_closures", "tomtom_incidents"):
         entity_id = source_entities[key]
         state = entity_component(entity_id, "TrafficEventCollectionState")
         observation = obs(entity_id)
@@ -455,8 +462,40 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
                     "source_key": key,
                     "source_authoritative_now": usable,
                     "source_availability": observation["availability"],
+                    "community_last_report_age_seconds": _freshness_seconds(event.get("community_last_report_at")),
                 }
             )
+
+    flow_state = entity_component(source_entities["tomtom_flow"], "TrafficFlowCollectionState")
+    flow_obs = obs(source_entities["tomtom_flow"])
+    flow_usable = flow_obs["availability"] in ("current", "degraded")
+    flow_probes = []
+    for probe in flow_state.get("probes") or []:
+        if not isinstance(probe, dict):
+            continue
+        current_speed = probe.get("current_speed_mph")
+        free_flow_speed = probe.get("free_flow_speed_mph")
+        speed_ratio = None
+        if isinstance(current_speed, (int, float)) and isinstance(free_flow_speed, (int, float)) and free_flow_speed > 0:
+            speed_ratio = current_speed / free_flow_speed
+        current_time = probe.get("current_travel_time_seconds")
+        free_time = probe.get("free_flow_travel_time_seconds")
+        travel_delay = None
+        if isinstance(current_time, (int, float)) and isinstance(free_time, (int, float)):
+            travel_delay = current_time - free_time
+        flow_probes.append({
+            **probe,
+            "speed_vs_free_flow": speed_ratio,
+            "travel_time_delta_seconds": travel_delay,
+            "source_authoritative_now": flow_usable,
+            "source_availability": flow_obs["availability"],
+        })
+    flow = {
+        **flow_state,
+        "probes": flow_probes,
+        "authoritative_now": flow_usable,
+        "observation": flow_obs,
+    }
 
     cameras_state = entity_component(source_entities["cameras"], "TrafficCameraCollectionState")
     cameras_obs = obs(source_entities["cameras"])
@@ -503,8 +542,28 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
             + str(center_lon)
         )
 
+    site = None
+    if (
+        site_anchor is not None
+        and site_anchor.enabled
+        and isinstance(site_anchor.latitude, (int, float))
+        and isinstance(site_anchor.longitude, (int, float))
+    ):
+        site = {
+            "label": site_anchor.label,
+            "address": site_anchor.address,
+            "latitude": site_anchor.latitude,
+            "longitude": site_anchor.longitude,
+            "position_kind": site_anchor.position_kind,
+            "source_lineage": site_anchor.source_lineage,
+            "source_record_id": site_anchor.source_record_id,
+            "source_verified_at": site_anchor.source_verified_at,
+            "source_artifact_sha256": site_anchor.source_artifact_sha256,
+            "live_operator_position": False,
+        }
+
     return {
-        "api_version": 1,
+        "api_version": 2,
         "presentation": {
             "mode": "read-only",
             "generated_at": _now_iso(),
@@ -515,6 +574,11 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
             "latitude": center_lat,
             "longitude": center_lon,
             "radius_miles": situation.get("scope_radius_miles"),
+            "role": "collection_scope_center",
+        },
+        "operator_context": {
+            "site_anchor": site,
+            "live_operator_position": None,
         },
         "summary": {
             "availability": situation_obs["availability"],
@@ -523,6 +587,7 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
             "full_closures": situation.get("full_closure_count"),
             "cameras": situation.get("camera_count"),
             "active_message_signs": situation.get("active_message_sign_count"),
+            "flow_probes": situation.get("flow_probe_count", 0),
             "source_families": situation.get("current_source_families", []),
             "correlation_mode": situation.get("correlation_mode"),
             "collection_gaps": situation.get("collection_gaps", []),
@@ -533,6 +598,7 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
         "kernels": situation.get("kernels", []),
         "cameras": cameras,
         "message_signs": signs,
+        "flow": flow,
         "map_context": {
             **radar_context,
             "displayable_now": bool(context_sha),
@@ -557,6 +623,18 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
             },
         },
         "external_visual_sources": {
+            "osm_reference": {
+                "enabled": True,
+                "mode": "browser_direct_reference",
+                "canonical_worldstate": False,
+                "provider": "OpenStreetMap standard tile service",
+                "tile_url_template": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                "max_zoom": 19,
+                "disclosure": (
+                    "OpenStreetMap standard tiles are browser-direct reference cartography only. "
+                    "They are not normalized into CIC WorldState and are not evidence or corroboration."
+                ),
+            },
             "waze": {
                 "enabled": bool(waze_url),
                 "mode": "operator_opt_in_browser_direct",
@@ -564,7 +642,7 @@ def build_traffic_projection(world: WorldState) -> dict[str, Any]:
                 "url": waze_url,
                 "disclosure": (
                     "Waze Live Map is an external browser-direct visual source. "
-                    "Its crowd reports are not normalized into CIC WorldState in RC1."
+                    "Its crowd reports are not normalized into CIC WorldState in RC2."
                 ),
             }
         },

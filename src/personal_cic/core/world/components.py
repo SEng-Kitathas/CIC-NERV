@@ -324,6 +324,18 @@ class TrafficEventObservation:
     source_organization: str | None = None
     source_id: str | None = None
     upstream_event_id: str | None = None
+    magnitude_of_delay: str | None = None
+    delay_seconds: int | None = None
+    length_meters: float | None = None
+    road_numbers: tuple[str, ...] = ()
+    from_location: str | None = None
+    to_location: str | None = None
+    probability_of_occurrence: str | None = None
+    time_validity: str | None = None
+    event_details: tuple[str, ...] = ()
+    event_codes: tuple[int, ...] = ()
+    community_report_count: int | None = None
+    community_last_report_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -401,6 +413,41 @@ class TrafficMessageSignCollectionState:
 
 
 @dataclass(frozen=True, slots=True)
+class TrafficFlowProbeObservation:
+    probe_id: str
+    label: str
+    source_family: str
+    provider: str
+    collection_class: str
+    query_latitude: float
+    query_longitude: float
+    match_method: str
+    functional_road_class: str | None
+    current_speed_mph: float | None
+    free_flow_speed_mph: float | None
+    current_travel_time_seconds: int | None
+    free_flow_travel_time_seconds: int | None
+    confidence: float | None
+    road_closure: bool | None
+    openlr: str | None
+    geometry: tuple[GeoPoint, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficFlowCollectionState:
+    location_label: str
+    provider: str
+    source_family: str
+    collection_class: str
+    scope_center_latitude: float
+    scope_center_longitude: float
+    scope_radius_miles: float
+    configured_probe_count: int
+    successful_probe_count: int
+    probes: tuple[TrafficFlowProbeObservation, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class TrafficEventKernel:
     kernel_id: str
     roadway: str | None
@@ -429,4 +476,5 @@ class TrafficSituationState:
     correlation_mode: str
     external_waze_visual_enabled: bool
     external_waze_zoom: int
+    flow_probe_count: int = 0
     kernels: tuple[TrafficEventKernel, ...] = ()

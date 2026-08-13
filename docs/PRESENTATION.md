@@ -45,7 +45,7 @@ The first release binds only to:
 
 A non-loopback bind is rejected by configuration validation.
 
-## Current endpoint
+## Original 0.3.0 Systems endpoint
 
 ```text
 GET /api/v1/systems
@@ -70,19 +70,19 @@ Slice 003 introduces a real concurrent reader of live WorldState.
 projection. The HTTP layer receives one immutable JSON-ready snapshot and
 performs no direct entity mutation.
 
-## Deferred
+## Current scope beyond original Slice 003
 
-This slice does not implement:
-- House controls;
-- world/traffic/weather/news;
-- RF sensing;
-- AI/model controls;
-- actuator registry;
-- alerts;
-- capability proof DAGs;
-- kiosk boot behavior.
+The original 0.3.0 surface intentionally deferred world/traffic/weather. Those capabilities are now
+embodied. Current loopback read-only surfaces include:
 
-Those remain later slices.
+```text
+/          Systems
+/world     weather / forecast / radar / alerts
+/traffic   multi-source traffic + geographic investigation map
+```
+
+House controls, privileged actuation, general RF interpretation, and AI/model control surfaces remain
+future work and must not be inferred from the existence of the read-only presentation server.
 
 ## World-provider re-entry
 
@@ -104,3 +104,38 @@ CURRENT is re-earned on success
 ```
 
 The World page also carries explicit Open-Meteo / CC BY 4.0 attribution.
+
+## 0.3.6 presentation sovereignty / execution assurance
+
+The presentation chain is part of the verified system proposition:
+
+```text
+WorldState
+    ↓
+CIC projection
+    ↓
+loopback HTTP + security headers
+    ↓
+browser execution runtime
+    ↓
+local/remote reference resources
+    ↓
+rendered operator interface
+```
+
+The browser is deliberately denied world and mutation authority, but it retains execution authority:
+it can admit/block requests, execute JavaScript/WebGL, propagate input, enforce CSP/referrer policy,
+use storage, and determine whether the operator receives a functioning projection.
+
+RC2D proved that a successful server/network probe is insufficient when the browser request contract
+differs. RC2D-R1 therefore preserves `Referrer-Policy: strict-origin-when-cross-origin` for the OSM
+reference-tile contract. Required MapLibre runtime assets are served locally from pinned bytes.
+
+Current sovereignty level is mixed: CIC owns projection and locally serves the map runtime, while OSM
+raster tiles remain a browser-direct reference dependency. They are reference cartography only;
+they do not become observations or canonical WorldState. The long-term geographic target is a local
+data substrate where remote providers refresh local assets rather than owning live-screen rendering.
+
+Human-facing claims still require human-perception evidence. A static/API test can prove structure; it
+cannot prove legibility, interaction quality, or that the rendered map is operationally usable.
+

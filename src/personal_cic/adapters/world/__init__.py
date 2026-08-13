@@ -26,3 +26,10 @@ __all__ += [
     "CMPDTrafficCADAdapter",
     "CharlotteStreetClosuresAdapter",
 ]
+from .tomtom_traffic import FlowProbeSpec, TomTomFlowAdapter, TomTomIncidentsAdapter
+
+__all__ += [
+    "FlowProbeSpec",
+    "TomTomFlowAdapter",
+    "TomTomIncidentsAdapter",
+]
