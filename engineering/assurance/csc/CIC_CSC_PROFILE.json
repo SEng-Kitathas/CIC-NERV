@@ -1,0 +1,24 @@
+{
+  "project_name": "CIC-NERV",
+  "authority_mode": "audit_only",
+  "source_roots": ["src", "tools", "tests", "config"],
+  "doctrine_roots": ["docs"],
+  "lineage_anchor": "engineering/lineage/csc/recovered/CSC_LINEAGE_RECOVERY_CAPSULE_V1_2026-08-14/MANIFEST.json",
+  "command_gates": [
+    {
+      "gate_id": "existing_quality_gate",
+      "command": ["{python}", "tools/quality_gate.py"],
+      "required": true
+    },
+    {
+      "gate_id": "source_distribution_working_tree",
+      "command": ["{python}", "tools/verify-source-distribution.py", "--working-tree", "--require-runtime-vendor"],
+      "required": true
+    },
+    {
+      "gate_id": "runtime_package_boundary",
+      "command": ["{python}", "tools/verify_runtime_package_boundary.py"],
+      "required": true
+    }
+  ]
+}
