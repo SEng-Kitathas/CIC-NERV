@@ -12,6 +12,8 @@ class SemanticKind(str, Enum):
     MEASUREMENT = "measurement"
     DATA_QUALITY = "data_quality"
     SOURCE_REPORT = "source_report"
+    PREDICTION = "prediction"
+    INFORMATION_ARTIFACT = "information_artifact"
     TEMPORAL = "temporal"
     EVIDENCE = "evidence"
     STATE_CONDITION = "state_condition"

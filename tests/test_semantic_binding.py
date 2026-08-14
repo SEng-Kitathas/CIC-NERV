@@ -205,3 +205,76 @@ class SemanticBindingRC3Tests(unittest.TestCase):
         self.assertEqual(signal.kind,SemanticKind.MEASUREMENT)
         self.assertEqual(signal.qualifiers["unit"],"dBm")
 
+
+
+class SemanticBindingRC4Tests(unittest.TestCase):
+    def test_daily_forecast_is_prediction_not_measurement(self):
+        from personal_cic.core.world.components import WeatherForecastState
+        w=WorldState(EventBus()); w.ensure_entity("forecast","Forecast")
+        w.upsert_component("forecast",ObservationState("open_meteo",ObservationAvailability.CURRENT,"retrieved-t1","retrieved-t1"))
+        w.upsert_component("forecast",WeatherForecastState("Test","Open-Meteo","America/New_York","2026-08-14",92.0,73.0,60.0,"2026-08-14T06:40","2026-08-14T20:15"))
+        high=next(x for x in project_world_semantics(w) if x.predicate=="forecast_high_temperature")
+        self.assertEqual(high.kind,SemanticKind.PREDICTION)
+        self.assertTrue(high.qualifiers["not_measurement"])
+        self.assertTrue(high.qualifiers["not_present_world_state"])
+        self.assertEqual(high.temporal.phenomenon_time,"2026-08-14")
+        self.assertEqual(high.temporal.observed_at,"retrieved-t1")
+
+    def test_hourly_forecast_preserves_future_time_and_provider_issue_time(self):
+        from personal_cic.core.world.components import NWSForecastHour, NWSHourlyForecastState
+        w=WorldState(EventBus()); w.ensure_entity("nws-hourly","NWS Hourly")
+        w.upsert_component("nws-hourly",ObservationState("nws.forecast",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("nws-hourly",NWSHourlyForecastState("Test","NWS","GSP",72,61,"generated-t0","updated-t1",
+            (NWSForecastHour("future-t3",88.0,70.0,58.0,40.0,5.0,10.0,"SW","Chance Showers"),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="forecast_temperature")
+        self.assertEqual(a.kind,SemanticKind.PREDICTION)
+        self.assertEqual(a.temporal.phenomenon_time,"future-t3")
+        self.assertEqual(a.temporal.source_time,"updated-t1")
+        self.assertEqual(a.temporal.observed_at,"retrieved-t2")
+
+    def test_same_forecast_proposition_reissued_at_new_source_time_gets_new_assertion(self):
+        from personal_cic.core.world.components import NWSForecastHour, NWSHourlyForecastState
+        def build(updated):
+            w=WorldState(EventBus()); w.ensure_entity("nws-hourly","NWS Hourly")
+            w.upsert_component("nws-hourly",ObservationState("nws.forecast",ObservationAvailability.CURRENT,"retrieved","retrieved"))
+            w.upsert_component("nws-hourly",NWSHourlyForecastState("Test","NWS","GSP",72,61,"generated",updated,
+                (NWSForecastHour("future",88.0,None,None,None,None,None,None,None),)))
+            return next(x for x in project_world_semantics(w) if x.predicate=="forecast_temperature")
+        a=build("issue-1"); b=build("issue-2")
+        self.assertEqual(a.proposition_key,b.proposition_key)
+        self.assertNotEqual(a.assertion_id,b.assertion_id)
+
+    def test_radar_mosaic_is_information_artifact_not_weather_measurement(self):
+        from personal_cic.core.world.components import RadarMosaicState
+        w=WorldState(EventBus()); w.ensure_entity("radar","Radar")
+        w.upsert_component("radar",ObservationState("radar.mosaic",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("radar",RadarMosaicState("Test","Iowa State","N0Q","base","latest.png","stream-t1","frame-t2",-82,33,-79,37,100,1000,800,"imgsha",False,None,True,"legendsha",(),15))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="radar_image_artifact")
+        self.assertEqual(a.kind,SemanticKind.INFORMATION_ARTIFACT)
+        self.assertTrue(a.qualifiers["artifact_is_not_weather_event_identity"])
+        self.assertTrue(a.qualifiers["requires_interpretation_for_world_claims"])
+
+    def test_camera_record_does_not_become_visual_evidence_without_interpretation(self):
+        from personal_cic.core.world.components import TrafficCameraCollectionState, TrafficCameraObservation
+        w=WorldState(EventBus()); w.ensure_entity("cams","Cameras")
+        w.upsert_component("cams",ObservationState("drivenc.cameras",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("cams",TrafficCameraCollectionState("Test","NCDOT","drivenc",35,-80,10,1,1,
+            (TrafficCameraObservation("cam1","drivenc","NCDOT","src1","Mecklenburg","I-485","N","MM 50",35.1,-80.8,"online","page","video"),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_camera")
+        self.assertEqual(a.kind,SemanticKind.INFORMATION_ARTIFACT)
+        self.assertTrue(a.qualifiers["camera_record_is_not_visual_observation_result"])
+        self.assertTrue(a.qualifiers["video_url_is_not_interpreted_world_evidence"])
+
+    def test_message_sign_text_is_information_artifact_not_event_truth(self):
+        from personal_cic.core.world.components import TrafficMessageSignCollectionState, TrafficMessageSignObservation
+        w=WorldState(EventBus()); w.ensure_entity("signs","Signs")
+        w.upsert_component("signs",ObservationState("drivenc.signs",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("signs",TrafficMessageSignCollectionState("Test","NCDOT","drivenc",35,-80,10,1,1,1,
+            (TrafficMessageSignObservation("s1","drivenc","NCDOT","Mecklenburg","I-485","N","Sign 1",35.2,-80.9,"source-t1",("CRASH AHEAD","USE CAUTION")),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_message_sign")
+        self.assertEqual(a.kind,SemanticKind.INFORMATION_ARTIFACT)
+        self.assertTrue(a.qualifiers["message_text_is_information_artifact"])
+        self.assertTrue(a.qualifiers["message_text_is_not_automatic_event_truth"])
+        self.assertEqual(a.temporal.source_time,"source-t1")
+        self.assertEqual(a.temporal.observed_at,"retrieved-t2")
+

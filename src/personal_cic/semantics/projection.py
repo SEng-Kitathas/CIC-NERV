@@ -11,6 +11,12 @@ from personal_cic.core.world.components import (
     HealthState,
     MemoryState,
     ObservationState,
+    NWSHourlyForecastState,
+    RadarContextState,
+    RadarMosaicState,
+    TrafficCameraCollectionState,
+    TrafficMessageSignCollectionState,
+    WeatherForecastState,
     StorageState,
     SurfaceObservationNetworkState,
     TemperatureState,
@@ -952,6 +958,319 @@ def _system_state(
                 )
 
 
+
+
+def _prediction_assertion(
+    *,
+    subject: str,
+    predicate: str,
+    value: object,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    identity_parts: tuple[object, ...],
+    qualifiers: Mapping[str, Any],
+) -> SemanticAssertion:
+    proposition = _proposition(subject, predicate)
+    return SemanticAssertion(
+        _id(proposition, *identity_parts),
+        proposition,
+        SemanticKind.PREDICTION,
+        "Epistemic assertion",
+        subject,
+        predicate,
+        value,
+        provenance,
+        temporal,
+        _q({
+            **qualifiers,
+            "epistemic_mode": "prediction",
+            "not_observation": True,
+            "not_measurement": True,
+            "not_present_world_state": True,
+        }),
+    )
+
+
+def _daily_weather_forecast(
+    entity: Entity,
+    state: WeatherForecastState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    provenance = _provider_provenance(entity, state.provider, observation)
+    subject = f"{entity.entity_id}:daily-forecast:{state.provider}:{state.forecast_date}"
+    temporal = SemanticTemporalContext(
+        phenomenon_time=state.forecast_date,
+        observed_at=observed_at,
+    )
+    common = {
+        **_authority_qualifiers(observation),
+        "provider": state.provider,
+        "forecast_date": state.forecast_date,
+        "provider_timezone": state.provider_timezone,
+        "forecast_granularity": "daily",
+    }
+    for predicate, value, quantity_kind, unit in (
+        ("forecast_high_temperature", state.high_f, "temperature", "degree_fahrenheit"),
+        ("forecast_low_temperature", state.low_f, "temperature", "degree_fahrenheit"),
+        ("forecast_precipitation_probability_max", state.precipitation_probability_max_percent, "probability", "percent"),
+    ):
+        if value is not None:
+            yield _prediction_assertion(
+                subject=subject,
+                predicate=predicate,
+                value=value,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(state.forecast_date, observed_at, predicate, value, state.provider),
+                qualifiers={**common, "quantity_kind": quantity_kind, "unit": unit},
+            )
+    for predicate, value in (
+        ("forecast_sunrise", state.sunrise),
+        ("forecast_sunset", state.sunset),
+    ):
+        if value is not None:
+            yield _prediction_assertion(
+                subject=subject,
+                predicate=predicate,
+                value=value,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(state.forecast_date, observed_at, predicate, value, state.provider),
+                qualifiers={**common, "value_role": "predicted_astronomical_event_time"},
+            )
+
+
+def _nws_hourly_forecast(
+    entity: Entity,
+    state: NWSHourlyForecastState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    provenance = _provider_provenance(entity, state.provider, observation)
+    source_time = state.updated_at or state.generated_at
+    for hour in state.hours:
+        subject = f"{entity.entity_id}:hourly-forecast:{hour.start_time}"
+        temporal = SemanticTemporalContext(
+            phenomenon_time=hour.start_time,
+            source_time=source_time,
+            observed_at=observed_at,
+        )
+        common = {
+            **_authority_qualifiers(observation),
+            "provider": state.provider,
+            "office": state.office,
+            "grid_x": state.grid_x,
+            "grid_y": state.grid_y,
+            "generated_at": state.generated_at,
+            "updated_at": state.updated_at,
+            "forecast_hour_start": hour.start_time,
+            "forecast_granularity": "hourly",
+        }
+        for predicate, value, quantity_kind, unit in (
+            ("forecast_temperature", hour.temperature_f, "temperature", "degree_fahrenheit"),
+            ("forecast_dewpoint", hour.dewpoint_f, "temperature", "degree_fahrenheit"),
+            ("forecast_relative_humidity", hour.relative_humidity_percent, "relative_humidity", "percent"),
+            ("forecast_precipitation_probability", hour.precipitation_probability_percent, "probability", "percent"),
+            ("forecast_wind_speed_min", hour.wind_speed_min_mph, "velocity", "mile_per_hour"),
+            ("forecast_wind_speed_max", hour.wind_speed_max_mph, "velocity", "mile_per_hour"),
+        ):
+            if value is not None:
+                yield _prediction_assertion(
+                    subject=subject,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    identity_parts=(hour.start_time, source_time, observed_at, predicate, value),
+                    qualifiers={**common, "quantity_kind": quantity_kind, "unit": unit},
+                )
+        for predicate, value in (
+            ("forecast_wind_direction", hour.wind_direction),
+            ("forecast_summary", hour.short_forecast),
+        ):
+            if value is not None:
+                yield _prediction_assertion(
+                    subject=subject,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    identity_parts=(hour.start_time, source_time, observed_at, predicate, value),
+                    qualifiers=common,
+                )
+
+
+def _radar_mosaic(
+    entity: Entity,
+    state: RadarMosaicState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    provenance = _provider_provenance(entity, state.provider, observation)
+    subject = f"{entity.entity_id}:radar-mosaic:{state.product}:{state.layer}"
+    temporal = SemanticTemporalContext(
+        source_time=state.stream_latest_at,
+        retrieved_at=state.frame_retrieved_at or observed_at,
+        observed_at=observed_at,
+    )
+    proposition = _proposition(subject, "radar_image_artifact")
+    yield SemanticAssertion(
+        _id(proposition, state.image_sha256, state.stream_latest_at, state.frame_retrieved_at),
+        proposition,
+        SemanticKind.INFORMATION_ARTIFACT,
+        "Epistemic assertion",
+        subject,
+        "radar_image_artifact",
+        state.image_sha256,
+        provenance,
+        temporal,
+        _q({
+            **_authority_qualifiers(observation),
+            "provider": state.provider,
+            "product": state.product,
+            "layer": state.layer,
+            "stream_latest_filename": state.stream_latest_filename,
+            "west": state.west,
+            "south": state.south,
+            "east": state.east,
+            "north": state.north,
+            "range_miles": state.range_miles,
+            "image_width": state.image_width,
+            "image_height": state.image_height,
+            "warning_overlay_available": state.warning_overlay_available,
+            "legend_available": state.legend_available,
+            "artifact_is_not_weather_event_identity": True,
+            "artifact_is_not_direct_weather_measurement": True,
+            "requires_interpretation_for_world_claims": True,
+        }),
+    )
+
+
+def _radar_context(
+    entity: Entity,
+    state: RadarContextState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    provenance = _provider_provenance(entity, state.provider, observation)
+    subject = f"{entity.entity_id}:radar-context"
+    temporal = SemanticTemporalContext(retrieved_at=state.retrieved_at)
+    proposition = _proposition(subject, "radar_context_artifact")
+    yield SemanticAssertion(
+        _id(proposition, state.context_sha256, state.content_sha256, state.retrieved_at),
+        proposition,
+        SemanticKind.INFORMATION_ARTIFACT,
+        "Epistemic assertion",
+        subject,
+        "radar_context_artifact",
+        state.context_sha256,
+        provenance,
+        temporal,
+        _q({
+            **_authority_qualifiers(observation),
+            "provider": state.provider,
+            "content_sha256": state.content_sha256,
+            "west": state.west,
+            "south": state.south,
+            "east": state.east,
+            "north": state.north,
+            "county_count": state.county_count,
+            "primary_road_count": state.primary_road_count,
+            "secondary_road_count": state.secondary_road_count,
+            "place_count": state.place_count,
+            "context_is_reference_information": True,
+            "not_dynamic_weather_state": True,
+        }),
+    )
+
+
+def _traffic_cameras(
+    entity: Entity,
+    state: TrafficCameraCollectionState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    for camera in state.cameras:
+        subject = f"{entity.entity_id}:camera-record:{camera.camera_id}"
+        provenance = _provider_provenance(
+            entity, camera.provider, observation,
+            record_ref=subject, native_record_id=camera.camera_id,
+        )
+        temporal = SemanticTemporalContext(observed_at=observed_at)
+        proposition = _proposition(subject, "provider_reports_camera")
+        yield SemanticAssertion(
+            _id(proposition, observed_at, camera.camera_id, camera.status, camera.video_url),
+            proposition,
+            SemanticKind.INFORMATION_ARTIFACT,
+            "Epistemic assertion",
+            subject,
+            "provider_reports_camera",
+            {
+                "status": camera.status,
+                "roadway": camera.roadway,
+                "direction": camera.direction,
+                "location": camera.location,
+                "latitude": camera.latitude,
+                "longitude": camera.longitude,
+                "page_url": camera.page_url,
+                "video_url": camera.video_url,
+            },
+            provenance,
+            temporal,
+            _q({
+                **_authority_qualifiers(observation),
+                "source_family": camera.source_family,
+                "source_id": camera.source_id,
+                "county": camera.county,
+                "record_is_infrastructure_description": True,
+                "camera_record_is_not_visual_observation_result": True,
+                "video_url_is_not_interpreted_world_evidence": True,
+            }),
+        )
+
+
+def _traffic_message_signs(
+    entity: Entity,
+    state: TrafficMessageSignCollectionState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    for sign in state.signs:
+        subject = f"{entity.entity_id}:message-sign-record:{sign.sign_id}"
+        provenance = _provider_provenance(
+            entity, sign.provider, observation,
+            record_ref=subject, native_record_id=sign.sign_id,
+        )
+        temporal = SemanticTemporalContext(
+            source_time=sign.updated_at,
+            observed_at=observed_at,
+        )
+        proposition = _proposition(subject, "provider_reports_message_sign")
+        yield SemanticAssertion(
+            _id(proposition, sign.updated_at, observed_at, sign.sign_id, sign.messages),
+            proposition,
+            SemanticKind.INFORMATION_ARTIFACT,
+            "Epistemic assertion",
+            subject,
+            "provider_reports_message_sign",
+            sign.messages,
+            provenance,
+            temporal,
+            _q({
+                **_authority_qualifiers(observation),
+                "source_family": sign.source_family,
+                "county": sign.county,
+                "roadway": sign.roadway,
+                "direction": sign.direction,
+                "name": sign.name,
+                "latitude": sign.latitude,
+                "longitude": sign.longitude,
+                "message_text_is_information_artifact": True,
+                "message_text_is_not_automatic_event_truth": True,
+            }),
+        )
+
+
 def _traffic_situation(
     entity: Entity,
     state: TrafficSituationState,
@@ -1054,6 +1373,14 @@ def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
     if weather is not None:
         out.extend(_weather_state(entity, weather, observation))
 
+    daily_forecast = entity.get(WeatherForecastState)
+    if daily_forecast is not None:
+        out.extend(_daily_weather_forecast(entity, daily_forecast, observation))
+
+    hourly_forecast = entity.get(NWSHourlyForecastState)
+    if hourly_forecast is not None:
+        out.extend(_nws_hourly_forecast(entity, hourly_forecast, observation))
+
     surface = entity.get(SurfaceObservationNetworkState)
     if surface is not None:
         out.extend(_surface_network(entity, surface, observation))
@@ -1065,6 +1392,22 @@ def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
     alerts = entity.get(WeatherAlertState)
     if alerts is not None:
         out.extend(_weather_alerts(entity, alerts, observation))
+
+    radar = entity.get(RadarMosaicState)
+    if radar is not None:
+        out.extend(_radar_mosaic(entity, radar, observation))
+
+    radar_context = entity.get(RadarContextState)
+    if radar_context is not None:
+        out.extend(_radar_context(entity, radar_context, observation))
+
+    cameras = entity.get(TrafficCameraCollectionState)
+    if cameras is not None:
+        out.extend(_traffic_cameras(entity, cameras, observation))
+
+    signs = entity.get(TrafficMessageSignCollectionState)
+    if signs is not None:
+        out.extend(_traffic_message_signs(entity, signs, observation))
 
     situation = entity.get(TrafficSituationState)
     if situation is not None:

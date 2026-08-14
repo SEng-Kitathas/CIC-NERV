@@ -82,3 +82,24 @@ RC3 does not create topology edges from component co-location in an Entity.
 
 It also does not introduce source-reliability scores, causal assertions, foreign
 ontology IRIs, or graph persistence. Those require independent runtime pressure.
+
+## RC4 — Forecast Modality + Information-Artifact Boundary
+
+Daily and hourly forecasts are predictive epistemic assertions, not observations,
+measurements, or present-world state. Forecast target time is `phenomenon_time`;
+provider issue/update time remains `source_time`; CIC collection time remains
+`observed_at`.
+
+**FORECAST VALUE IS NOT OBSERVED VALUE.**
+**PREDICTION IS NOT MEASUREMENT.**
+**FUTURE PHENOMENON TIME IS NOT SOURCE ISSUE TIME.**
+
+Radar mosaics/context, traffic-camera records, and dynamic-message-sign records are
+preserved as information artifacts. They do not become weather-event identity,
+interpreted visual evidence, or physical-event truth without an explicit interpretation
+process.
+
+**INFORMATION ARTIFACT REQUIRES INTERPRETATION BEFORE BECOMING A WORLD CLAIM.**
+**CAMERA RECORD IS NOT CAMERA OBSERVATION RESULT.**
+**MESSAGE TEXT IS NOT EVENT TRUTH.**
+
