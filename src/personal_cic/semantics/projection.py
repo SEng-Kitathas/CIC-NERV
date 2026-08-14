@@ -1,11 +1,30 @@
 from __future__ import annotations
+
 from hashlib import sha256
 from types import MappingProxyType
-from typing import Iterable, Mapping, Any
+from typing import Any, Iterable, Mapping
+
 from personal_cic.core.observations import ObservationAvailability
-from personal_cic.core.world.components import ObservationState, TrafficFlowCollectionState, TrafficSituationState
+from personal_cic.core.world.components import (
+    ComputeState,
+    CurrentWeatherEstimateState,
+    HealthState,
+    MemoryState,
+    ObservationState,
+    StorageState,
+    SurfaceObservationNetworkState,
+    TemperatureState,
+    TrafficEventCollectionState,
+    TrafficFlowCollectionState,
+    TrafficSituationState,
+    UsbDeviceState,
+    WeatherAlertState,
+    WeatherState,
+    WifiLinkState,
+)
 from personal_cic.core.world.entity import Entity
 from personal_cic.core.world.store import WorldState
+
 from .model import (
     SemanticAssertion,
     SemanticAssertionOrigin,
@@ -29,47 +48,268 @@ def _q(values: Mapping[str, Any]) -> Mapping[str, Any]:
     return MappingProxyType(dict(values))
 
 
-def _source(ref_id: str, role: SemanticSourceRole, *, authority: str | None = None, native_id: str | None = None) -> SemanticSourceRef:
+def _source(
+    ref_id: str,
+    role: SemanticSourceRole,
+    *,
+    authority: str | None = None,
+    native_id: str | None = None,
+) -> SemanticSourceRef:
     return SemanticSourceRef(ref_id, role, authority, native_id)
 
 
+def _authority_qualifiers(observation: ObservationState | None) -> dict[str, Any]:
+    if observation is None:
+        return {"semantic_authority_state": "unscoped", "current_authority": None}
+    if observation.availability is ObservationAvailability.CURRENT:
+        return {
+            "semantic_authority_state": "current",
+            "current_authority": True,
+            "observation_checked_at": observation.checked_at,
+            "observation_last_success_at": observation.last_success_at,
+        }
+    if observation.availability is ObservationAvailability.DEGRADED:
+        return {
+            "semantic_authority_state": "degraded_or_mixed",
+            "current_authority": "qualified",
+            "observation_checked_at": observation.checked_at,
+            "observation_last_success_at": observation.last_success_at,
+            "observation_reasons": observation.reasons,
+        }
+    if observation.availability is ObservationAvailability.RETAINED:
+        return {
+            "semantic_authority_state": "retained_by_policy",
+            "current_authority": "policy_qualified",
+            "observation_checked_at": observation.checked_at,
+            "observation_last_success_at": observation.last_success_at,
+            "observation_reasons": observation.reasons,
+        }
+    return {
+        "semantic_authority_state": "last_known_noncurrent",
+        "current_authority": False,
+        "observation_checked_at": observation.checked_at,
+        "observation_last_success_at": observation.last_success_at,
+        "observation_reasons": observation.reasons,
+    }
+
+
+def _adapter_sources(entity: Entity, observation: ObservationState | None) -> tuple[SemanticSourceRef, ...]:
+    world = _source(
+        entity.entity_id,
+        SemanticSourceRole.WORLD_ENTITY_REFERENCE,
+        native_id=entity.entity_id,
+    )
+    if observation is None:
+        return (world,)
+    adapter = _source(
+        f"adapter:{observation.adapter_id}",
+        SemanticSourceRole.ADAPTER,
+        native_id=observation.adapter_id,
+    )
+    return (adapter, world)
+
+
+def _provider_provenance(
+    entity: Entity,
+    provider: str,
+    observation: ObservationState | None,
+    *,
+    record_ref: str | None = None,
+    native_record_id: str | None = None,
+) -> SemanticProvenance:
+    provider_ref = _source(
+        f"provider:{provider}",
+        SemanticSourceRole.PROVIDER,
+        authority=provider,
+    )
+    sources: list[SemanticSourceRef] = [provider_ref, *_adapter_sources(entity, observation)]
+    if record_ref is not None:
+        sources.insert(
+            1,
+            _source(
+                record_ref,
+                SemanticSourceRole.SOURCE_RECORD,
+                authority=provider,
+                native_id=native_record_id,
+            ),
+        )
+    return SemanticProvenance(SemanticAssertionOrigin.SOURCE_OBSERVED, tuple(sources))
+
+
+def _derived_provenance(entity: Entity, process: str) -> SemanticProvenance:
+    derivation = _source(
+        f"derivation:{process}",
+        SemanticSourceRole.DERIVATION_PROCESS,
+        native_id=process,
+    )
+    world = _source(
+        entity.entity_id,
+        SemanticSourceRole.WORLD_ENTITY_REFERENCE,
+        native_id=entity.entity_id,
+    )
+    return SemanticProvenance(
+        SemanticAssertionOrigin.CIC_DERIVED,
+        (derivation, world),
+        derivation.ref_id,
+    )
+
+
+def _measurement(
+    *,
+    subject: str,
+    predicate: str,
+    value: object,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    quantity_kind: str,
+    unit: str | None,
+    measurement_kind: str,
+    identity_parts: tuple[object, ...],
+    qualifiers: Mapping[str, Any] | None = None,
+) -> SemanticAssertion:
+    proposition = _proposition(subject, predicate)
+    q: dict[str, Any] = {
+        "quantity_kind": quantity_kind,
+        "unit": unit,
+        "measurement_kind": measurement_kind,
+    }
+    if qualifiers:
+        q.update(qualifiers)
+    return SemanticAssertion(
+        _id(proposition, *identity_parts),
+        proposition,
+        SemanticKind.MEASUREMENT,
+        "Measurement assertion",
+        subject,
+        predicate,
+        value,
+        provenance,
+        temporal,
+        _q(q),
+    )
+
+
 def _observation(entity: Entity, state: ObservationState) -> Iterable[SemanticAssertion]:
-    adapter = _source(f"adapter:{state.adapter_id}", SemanticSourceRole.ADAPTER, native_id=state.adapter_id)
-    world = _source(entity.entity_id, SemanticSourceRole.WORLD_ENTITY_REFERENCE, native_id=entity.entity_id)
-    provenance = SemanticProvenance(SemanticAssertionOrigin.SOURCE_OBSERVED, (adapter, world))
+    adapter = _source(
+        f"adapter:{state.adapter_id}",
+        SemanticSourceRole.ADAPTER,
+        native_id=state.adapter_id,
+    )
+    world = _source(
+        entity.entity_id,
+        SemanticSourceRole.WORLD_ENTITY_REFERENCE,
+        native_id=entity.entity_id,
+    )
+    provenance = SemanticProvenance(
+        SemanticAssertionOrigin.SOURCE_OBSERVED,
+        (adapter, world),
+    )
     temporal = SemanticTemporalContext(observed_at=state.checked_at)
     proposition = _proposition(entity.entity_id, "observation", state.adapter_id, "availability")
     yield SemanticAssertion(
-        _id(proposition, state.checked_at, state.availability.value, state.reasons), proposition,
-        SemanticKind.OBSERVATION_STATE, "Observation boundary", entity.entity_id, "observation_availability",
-        state.availability.value, provenance, temporal,
-        _q({"checked_at": state.checked_at, "last_success_at": state.last_success_at, "reasons": state.reasons}),
+        _id(proposition, state.checked_at, state.availability.value, state.reasons),
+        proposition,
+        SemanticKind.OBSERVATION_STATE,
+        "Observation boundary",
+        entity.entity_id,
+        "observation_availability",
+        state.availability.value,
+        provenance,
+        temporal,
+        _q(
+            {
+                "checked_at": state.checked_at,
+                "last_success_at": state.last_success_at,
+                "reasons": state.reasons,
+            }
+        ),
     )
     if state.availability is ObservationAvailability.UNAVAILABLE:
-        proposition = _proposition(entity.entity_id, "absence", state.adapter_id, "new_observation_unavailable")
+        proposition = _proposition(
+            entity.entity_id,
+            "absence",
+            state.adapter_id,
+            "new_observation_unavailable",
+        )
         yield SemanticAssertion(
-            _id(proposition, state.checked_at, state.reasons), proposition,
-            SemanticKind.ABSENCE, "Absence assertion", entity.entity_id, "new_observation_unavailable", True,
-            provenance, temporal,
-            _q({"absence_role": "collection_failure_or_unavailability", "does_not_assert_negative_world_state": True, "reasons": state.reasons}),
+            _id(proposition, state.checked_at, state.reasons),
+            proposition,
+            SemanticKind.ABSENCE,
+            "Absence assertion",
+            entity.entity_id,
+            "new_observation_unavailable",
+            True,
+            provenance,
+            temporal,
+            _q(
+                {
+                    "absence_role": "collection_failure_or_unavailability",
+                    "does_not_assert_negative_world_state": True,
+                    "reasons": state.reasons,
+                }
+            ),
         )
 
 
-def _traffic_flow(entity: Entity, state: TrafficFlowCollectionState, observation: ObservationState | None) -> Iterable[SemanticAssertion]:
+def _traffic_flow(
+    entity: Entity,
+    state: TrafficFlowCollectionState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
     observed_at = observation.checked_at if observation is not None else None
-    adapter_source = (
-        (_source(f"adapter:{observation.adapter_id}", SemanticSourceRole.ADAPTER, native_id=observation.adapter_id),)
-        if observation is not None else ()
-    )
-    world = _source(entity.entity_id, SemanticSourceRole.WORLD_ENTITY_REFERENCE, native_id=entity.entity_id)
+    auth = _authority_qualifiers(observation)
+    collection_subject = f"{entity.entity_id}:flow-collection:{state.provider}"
+    collection_provenance = _provider_provenance(entity, state.provider, observation)
+
+    if state.configured_probe_count > 0:
+        proposition = _proposition(collection_subject, "probe_collection_completeness")
+        yield SemanticAssertion(
+            _id(
+                proposition,
+                observed_at,
+                state.successful_probe_count,
+                state.configured_probe_count,
+                state.provider,
+            ),
+            proposition,
+            SemanticKind.DATA_QUALITY,
+            "Data product quality assessment",
+            collection_subject,
+            "probe_collection_completeness",
+            state.successful_probe_count / state.configured_probe_count,
+            collection_provenance,
+            SemanticTemporalContext(observed_at=observed_at),
+            _q(
+                {
+                    **auth,
+                    "quality_dimension": "collection_completeness",
+                    "metric": "successful_probe_count/configured_probe_count",
+                    "successful_probe_count": state.successful_probe_count,
+                    "configured_probe_count": state.configured_probe_count,
+                    "not_claim_confidence": True,
+                    "not_source_reliability": True,
+                }
+            ),
+        )
+
     for probe in state.probes:
         subject = f"{entity.entity_id}:flow-probe:{probe.probe_id}"
-        provider = _source(f"provider:{probe.provider}", SemanticSourceRole.PROVIDER, authority=probe.provider)
-        record = _source(subject, SemanticSourceRole.SOURCE_RECORD, authority=probe.provider, native_id=probe.probe_id)
-        provenance = SemanticProvenance(SemanticAssertionOrigin.SOURCE_OBSERVED, (provider, *adapter_source, record, world))
+        provenance = _provider_provenance(
+            entity,
+            probe.provider,
+            observation,
+            record_ref=subject,
+            native_record_id=probe.probe_id,
+        )
         temporal = SemanticTemporalContext(observed_at=observed_at)
-        common = {"provider": probe.provider, "source_family": probe.source_family, "collection_class": probe.collection_class,
-                  "match_method": probe.match_method, "openlr": probe.openlr}
+        common = {
+            **auth,
+            "provider": probe.provider,
+            "source_family": probe.source_family,
+            "collection_class": probe.collection_class,
+            "match_method": probe.match_method,
+            "openlr": probe.openlr,
+        }
         for prop, value, qk, unit in (
             ("current_speed", probe.current_speed_mph, "velocity", "mile_per_hour"),
             ("free_flow_speed", probe.free_flow_speed_mph, "velocity", "mile_per_hour"),
@@ -77,68 +317,765 @@ def _traffic_flow(entity: Entity, state: TrafficFlowCollectionState, observation
             ("free_flow_travel_time", probe.free_flow_travel_time_seconds, "duration", "second"),
         ):
             if value is not None:
-                proposition = _proposition(subject, prop)
-                yield SemanticAssertion(
-                    _id(proposition, observed_at, value, probe.provider, probe.probe_id), proposition,
-                    SemanticKind.MEASUREMENT, "Measurement assertion", subject, prop, value,
-                    provenance, temporal,
-                    _q({**common, "quantity_kind": qk, "unit": unit, "scale_type": "ratio", "measurement_kind": "provider_modeled_telemetry"}),
+                yield _measurement(
+                    subject=subject,
+                    predicate=prop,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    quantity_kind=qk,
+                    unit=unit,
+                    measurement_kind="provider_modeled_telemetry",
+                    identity_parts=(
+                        observed_at,
+                        value,
+                        probe.provider,
+                        probe.probe_id,
+                    ),
+                    qualifiers={**common, "scale_type": "ratio"},
                 )
+
         if probe.confidence is not None:
             proposition = _proposition(subject, "provider-native-confidence")
-            foreign_provenance = SemanticProvenance(SemanticAssertionOrigin.FOREIGN_NATIVE_PRESERVED, provenance.sources)
+            foreign_provenance = SemanticProvenance(
+                SemanticAssertionOrigin.FOREIGN_NATIVE_PRESERVED,
+                provenance.sources,
+            )
             yield SemanticAssertion(
-                _id(proposition, observed_at, probe.confidence, probe.provider, probe.probe_id), proposition,
-                SemanticKind.FOREIGN_NATIVE, "Foreign semantic preservation", subject, "tomtom_flow_confidence", probe.confidence,
-                foreign_provenance, temporal,
-                _q({**common, "local_semantic_role": "unresolved", "not_claim_confidence": True, "not_source_reliability": True,
-                    "not_data_product_quality": True, "not_measurement_uncertainty_without_provider_contract": True}),
+                _id(
+                    proposition,
+                    observed_at,
+                    probe.confidence,
+                    probe.provider,
+                    probe.probe_id,
+                ),
+                proposition,
+                SemanticKind.FOREIGN_NATIVE,
+                "Foreign semantic preservation",
+                subject,
+                "tomtom_flow_confidence",
+                probe.confidence,
+                foreign_provenance,
+                temporal,
+                _q(
+                    {
+                        **common,
+                        "local_semantic_role": "unresolved",
+                        "not_claim_confidence": True,
+                        "not_source_reliability": True,
+                        "not_data_product_quality": True,
+                        "not_measurement_uncertainty_without_provider_contract": True,
+                    }
+                ),
             )
 
 
-def _traffic_situation(entity: Entity, state: TrafficSituationState) -> Iterable[SemanticAssertion]:
-    derivation = _source("derivation:traffic.fusion", SemanticSourceRole.DERIVATION_PROCESS, native_id="traffic.fusion")
-    world = _source(entity.entity_id, SemanticSourceRole.WORLD_ENTITY_REFERENCE, native_id=entity.entity_id)
-    provenance = SemanticProvenance(SemanticAssertionOrigin.CIC_DERIVED, (derivation, world), derivation.ref_id)
+def _traffic_events(
+    entity: Entity,
+    state: TrafficEventCollectionState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    auth = _authority_qualifiers(observation)
+    collection_ref = f"{entity.entity_id}:event-collection:{state.source_family}"
+    collection_provenance = _provider_provenance(entity, state.provider, observation)
+
+    if (
+        observation is not None
+        and observation.availability is ObservationAvailability.CURRENT
+        and state.local_record_count == 0
+    ):
+        proposition = _proposition(
+            collection_ref,
+            "current_collection_supports_no_local_records",
+        )
+        yield SemanticAssertion(
+            _id(
+                proposition,
+                observation.checked_at,
+                state.source_record_count,
+                state.scope_radius_miles,
+            ),
+            proposition,
+            SemanticKind.EVIDENCE,
+            "Evidence relation",
+            collection_ref,
+            "current_collection_supports_no_local_records",
+            True,
+            collection_provenance,
+            SemanticTemporalContext(observed_at=observation.checked_at),
+            _q(
+                {
+                    **auth,
+                    "scope_radius_miles": state.scope_radius_miles,
+                    "source_record_count": state.source_record_count,
+                    "negative_evidence_scope": (
+                        "this provider/source family and configured collection scope only"
+                    ),
+                    "not_universal_event_absence": True,
+                }
+            ),
+        )
+
+    for event in state.events:
+        record_ref = (
+            f"{entity.entity_id}:event-record:"
+            f"{state.source_family}:{event.source_record_id}"
+        )
+        provenance = _provider_provenance(
+            entity,
+            event.provider,
+            observation,
+            record_ref=record_ref,
+            native_record_id=event.source_record_id,
+        )
+        source_time = event.updated_at or event.reported_at
+        temporal = SemanticTemporalContext(
+            phenomenon_time=event.start_at,
+            source_time=source_time,
+            observed_at=observed_at,
+        )
+        proposition = _proposition(record_ref, "provider_reports_event_record")
+        yield SemanticAssertion(
+            _id(
+                proposition,
+                event.source_record_id,
+                event.updated_at,
+                event.reported_at,
+                observed_at,
+            ),
+            proposition,
+            SemanticKind.SOURCE_REPORT,
+            "Epistemic assertion",
+            record_ref,
+            "provider_reports_event_record",
+            {
+                "event_type": event.event_type,
+                "event_subtype": event.event_subtype,
+                "description": event.description,
+                "roadway": event.roadway,
+                "direction": event.direction,
+                "county": event.county,
+                "severity": event.severity,
+                "full_closure": event.full_closure,
+            },
+            provenance,
+            temporal,
+            _q(
+                {
+                    **auth,
+                    "source_family": event.source_family,
+                    "collection_class": event.collection_class,
+                    "source_organization": event.source_organization,
+                    "source_id": event.source_id,
+                    "upstream_event_id": event.upstream_event_id,
+                    "reported_at": event.reported_at,
+                    "updated_at": event.updated_at,
+                    "event_start_at": event.start_at,
+                    "event_end_at": event.end_at,
+                    "community_last_report_at": event.community_last_report_at,
+                    "record_is_not_world_event_identity": True,
+                    "report_does_not_establish_causality": True,
+                }
+            ),
+        )
+
+
+def _weather_state(
+    entity: Entity,
+    state: WeatherState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    auth = _authority_qualifiers(observation)
+    provenance = _provider_provenance(entity, state.provider, observation)
+    observed_at = observation.checked_at if observation is not None else None
+    temporal = SemanticTemporalContext(
+        phenomenon_time=state.provider_observed_at,
+        observed_at=observed_at,
+    )
+    subject = f"{entity.entity_id}:weather-current:{state.provider}"
+    common = {
+        **auth,
+        "provider": state.provider,
+        "provider_observed_at": state.provider_observed_at,
+        "provider_timezone": state.provider_timezone,
+        "scale_type": "ratio",
+        "not_direct_sensor_claim": True,
+    }
+    for prop, value, qk, unit in (
+        ("temperature", state.temperature_f, "temperature", "degree_fahrenheit"),
+        (
+            "apparent_temperature",
+            state.apparent_temperature_f,
+            "temperature",
+            "degree_fahrenheit",
+        ),
+        (
+            "relative_humidity",
+            state.relative_humidity_percent,
+            "relative_humidity",
+            "percent",
+        ),
+        ("precipitation", state.precipitation_in, "length", "inch"),
+        ("cloud_cover", state.cloud_cover_percent, "cloud_cover_fraction", "percent"),
+        ("wind_speed", state.wind_speed_mph, "velocity", "mile_per_hour"),
+        ("wind_direction", state.wind_direction_deg, "plane_angle", "degree"),
+        ("wind_gust", state.wind_gust_mph, "velocity", "mile_per_hour"),
+    ):
+        if value is not None:
+            yield _measurement(
+                subject=subject,
+                predicate=prop,
+                value=value,
+                provenance=provenance,
+                temporal=temporal,
+                quantity_kind=qk,
+                unit=unit,
+                measurement_kind="provider_current_value",
+                identity_parts=(
+                    state.provider_observed_at,
+                    observed_at,
+                    value,
+                    state.provider,
+                ),
+                qualifiers=common,
+            )
+
+
+def _surface_network(
+    entity: Entity,
+    state: SurfaceObservationNetworkState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    auth = _authority_qualifiers(observation)
+    observed_at = observation.checked_at if observation is not None else None
+    for station in state.stations:
+        subject = f"{entity.entity_id}:surface-station:{station.station_id}"
+        record_ref = f"surface-station-record:{station.station_id}:{station.observed_at}"
+        provenance = _provider_provenance(
+            entity,
+            state.provider,
+            observation,
+            record_ref=record_ref,
+            native_record_id=station.station_id,
+        )
+        temporal = SemanticTemporalContext(
+            phenomenon_time=station.observed_at,
+            observed_at=observed_at,
+        )
+        common = {
+            **auth,
+            "provider": state.provider,
+            "station_id": station.station_id,
+            "station_name": station.station_name,
+            "station_observed_at": station.observed_at,
+            "latitude": station.latitude,
+            "longitude": station.longitude,
+            "distance_mi": station.distance_mi,
+            "scale_type": "ratio",
+        }
+        for prop, value, qk, unit in (
+            ("temperature", station.temperature_f, "temperature", "degree_fahrenheit"),
+            ("dewpoint", station.dewpoint_f, "temperature", "degree_fahrenheit"),
+            (
+                "relative_humidity",
+                station.relative_humidity_percent,
+                "relative_humidity",
+                "percent",
+            ),
+            ("wind_direction", station.wind_direction_deg, "plane_angle", "degree"),
+            ("wind_speed", station.wind_speed_mph, "velocity", "mile_per_hour"),
+            ("wind_gust", station.wind_gust_mph, "velocity", "mile_per_hour"),
+            ("visibility", station.visibility_sm, "length", "statute_mile"),
+            ("altimeter", station.altimeter_inhg, "pressure", "inch_of_mercury"),
+            (
+                "sea_level_pressure",
+                station.sea_level_pressure_hpa,
+                "pressure",
+                "hectopascal",
+            ),
+            ("ceiling", station.ceiling_ft_agl, "length", "foot"),
+        ):
+            if value is not None:
+                yield _measurement(
+                    subject=subject,
+                    predicate=prop,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    quantity_kind=qk,
+                    unit=unit,
+                    measurement_kind="direct_station_observation",
+                    identity_parts=(
+                        station.station_id,
+                        station.observed_at,
+                        observed_at,
+                        value,
+                    ),
+                    qualifiers=common,
+                )
+
+
+def _weather_estimate(
+    entity: Entity,
+    state: CurrentWeatherEstimateState,
+) -> Iterable[SemanticAssertion]:
+    provenance = _derived_provenance(entity, state.method)
+    temporal = SemanticTemporalContext(derived_at=state.derived_at)
+    subject = f"{entity.entity_id}:current-weather-estimate"
+    common = {
+        "semantic_authority_state": "locally_derived",
+        "current_authority": True,
+        "derived_at": state.derived_at,
+        "derivation_method": state.method,
+        "primary_source": state.primary_source,
+        "surface_station_count": state.surface_station_count,
+        "scale_type": "ratio",
+        "not_direct_observation": True,
+    }
+    for prop, value, qk, unit in (
+        ("temperature", state.temperature_f, "temperature", "degree_fahrenheit"),
+        ("dewpoint", state.dewpoint_f, "temperature", "degree_fahrenheit"),
+        (
+            "relative_humidity",
+            state.relative_humidity_percent,
+            "relative_humidity",
+            "percent",
+        ),
+        ("wind_direction", state.wind_direction_deg, "plane_angle", "degree"),
+        ("wind_speed", state.wind_speed_mph, "velocity", "mile_per_hour"),
+        ("wind_gust", state.wind_gust_mph, "velocity", "mile_per_hour"),
+        ("visibility", state.visibility_sm, "length", "statute_mile"),
+        ("altimeter", state.altimeter_inhg, "pressure", "inch_of_mercury"),
+        ("ceiling", state.ceiling_ft_agl, "length", "foot"),
+        (
+            "surface_temperature_spread",
+            state.surface_temperature_spread_f,
+            "temperature_difference",
+            "degree_fahrenheit",
+        ),
+    ):
+        if value is not None:
+            yield _measurement(
+                subject=subject,
+                predicate=prop,
+                value=value,
+                provenance=provenance,
+                temporal=temporal,
+                quantity_kind=qk,
+                unit=unit,
+                measurement_kind="derived_estimate",
+                identity_parts=(state.derived_at, state.method, value),
+                qualifiers=common,
+            )
+
+
+def _weather_alerts(
+    entity: Entity,
+    state: WeatherAlertState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    auth = _authority_qualifiers(observation)
+    for alert in state.alerts:
+        record_ref = f"{entity.entity_id}:weather-alert-record:{alert.alert_id}"
+        provenance = _provider_provenance(
+            entity,
+            state.provider,
+            observation,
+            record_ref=record_ref,
+            native_record_id=alert.alert_id,
+        )
+        temporal = SemanticTemporalContext(
+            phenomenon_time=alert.effective_at,
+            source_time=alert.sent_at,
+            observed_at=observed_at,
+        )
+        proposition = _proposition(record_ref, "provider_reports_alert")
+        yield SemanticAssertion(
+            _id(
+                proposition,
+                alert.alert_id,
+                alert.sent_at,
+                alert.effective_at,
+                alert.expires_at,
+                observed_at,
+            ),
+            proposition,
+            SemanticKind.SOURCE_REPORT,
+            "Epistemic assertion",
+            record_ref,
+            "provider_reports_alert",
+            {
+                "event": alert.event,
+                "severity": alert.severity,
+                "urgency": alert.urgency,
+                "headline": alert.headline,
+            },
+            provenance,
+            temporal,
+            _q(
+                {
+                    **auth,
+                    "sent_at": alert.sent_at,
+                    "effective_at": alert.effective_at,
+                    "expires_at": alert.expires_at,
+                    "provider_updated_at": state.provider_updated_at,
+                    "record_is_not_hazard_identity": True,
+                }
+            ),
+        )
+
+
+def _system_state(
+    entity: Entity,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    auth = _authority_qualifiers(observation)
+    observed_at = observation.checked_at if observation is not None else None
+    provenance = SemanticProvenance(
+        SemanticAssertionOrigin.SOURCE_OBSERVED,
+        _adapter_sources(entity, observation),
+    )
+    temporal = SemanticTemporalContext(observed_at=observed_at)
+
+    health = entity.get(HealthState)
+    if health is not None:
+        derived = _derived_provenance(entity, "health-system")
+        proposition = _proposition(entity.entity_id, "health_status")
+        yield SemanticAssertion(
+            _id(proposition, health.status.value, health.reasons),
+            proposition,
+            SemanticKind.STATE_CONDITION,
+            "State condition",
+            entity.entity_id,
+            "health_status",
+            health.status.value,
+            derived,
+            SemanticTemporalContext(derived_at=observed_at),
+            _q(
+                {
+                    "semantic_authority_state": "locally_derived",
+                    "current_authority": True,
+                    "reasons": health.reasons,
+                    "condition_scope": "derived operational health",
+                    "health_is_not_raw_telemetry": True,
+                }
+            ),
+        )
+
+    compute = entity.get(ComputeState)
+    if compute is not None:
+        for prop, value, qk, unit, extra in (
+            (
+                "cpu_utilization",
+                compute.cpu_percent,
+                "dimensionless_ratio",
+                "percent",
+                {"logical_cpus": compute.logical_cpus},
+            ),
+            (
+                "load_per_cpu",
+                compute.load_per_cpu,
+                "dimensionless_ratio",
+                None,
+                {"load_1m": compute.load_1m},
+            ),
+        ):
+            yield _measurement(
+                subject=entity.entity_id,
+                predicate=prop,
+                value=value,
+                provenance=provenance,
+                temporal=temporal,
+                quantity_kind=qk,
+                unit=unit,
+                measurement_kind=(
+                    "host_telemetry"
+                    if prop == "cpu_utilization"
+                    else "derived_host_telemetry"
+                ),
+                identity_parts=(observed_at, value, prop),
+                qualifiers={**auth, "scale_type": "ratio", **extra},
+            )
+
+    memory = entity.get(MemoryState)
+    if memory is not None:
+        yield _measurement(
+            subject=entity.entity_id,
+            predicate="memory_used",
+            value=memory.used_percent,
+            provenance=provenance,
+            temporal=temporal,
+            quantity_kind="dimensionless_ratio",
+            unit="percent",
+            measurement_kind="host_telemetry",
+            identity_parts=(observed_at, memory.used_percent, "memory"),
+            qualifiers={**auth, "scale_type": "ratio"},
+        )
+
+    storage = entity.get(StorageState)
+    if storage is not None:
+        yield _measurement(
+            subject=f"{entity.entity_id}:storage:{storage.mountpoint}",
+            predicate="storage_used",
+            value=storage.used_percent,
+            provenance=provenance,
+            temporal=temporal,
+            quantity_kind="dimensionless_ratio",
+            unit="percent",
+            measurement_kind="host_telemetry",
+            identity_parts=(observed_at, storage.mountpoint, storage.used_percent),
+            qualifiers={
+                **auth,
+                "scale_type": "ratio",
+                "mountpoint": storage.mountpoint,
+            },
+        )
+
+    temperature = entity.get(TemperatureState)
+    if temperature is not None and temperature.celsius is not None:
+        temp_source = _source(
+            f"sensor:{temperature.source or 'unknown'}",
+            SemanticSourceRole.SOURCE_RECORD,
+            native_id=temperature.source,
+        )
+        temp_provenance = SemanticProvenance(
+            SemanticAssertionOrigin.SOURCE_OBSERVED,
+            (temp_source, *_adapter_sources(entity, observation)),
+        )
+        yield _measurement(
+            subject=entity.entity_id,
+            predicate="temperature",
+            value=temperature.celsius,
+            provenance=temp_provenance,
+            temporal=temporal,
+            quantity_kind="temperature",
+            unit="degree_celsius",
+            measurement_kind="host_sensor_telemetry",
+            identity_parts=(
+                observed_at,
+                temperature.source,
+                temperature.celsius,
+            ),
+            qualifiers={**auth, "scale_type": "interval"},
+        )
+
+    usb = entity.get(UsbDeviceState)
+    if usb is not None:
+        proposition = _proposition(entity.entity_id, "usb_device_present")
+        yield SemanticAssertion(
+            _id(proposition, observed_at, usb.usb_id, usb.present, usb.mode),
+            proposition,
+            SemanticKind.STATE_CONDITION,
+            "State condition",
+            entity.entity_id,
+            "usb_device_present",
+            usb.present,
+            provenance,
+            temporal,
+            _q(
+                {
+                    **auth,
+                    "usb_id": usb.usb_id,
+                    "mode": usb.mode,
+                    "description": usb.description,
+                    "successful_absence_is_world_evidence_only_when_current": True,
+                }
+            ),
+        )
+
+    wifi = entity.get(WifiLinkState)
+    if wifi is not None:
+        proposition = _proposition(entity.entity_id, "wifi_connected")
+        yield SemanticAssertion(
+            _id(proposition, observed_at, wifi.interface, wifi.ssid, wifi.connected),
+            proposition,
+            SemanticKind.STATE_CONDITION,
+            "State condition",
+            entity.entity_id,
+            "wifi_connected",
+            wifi.connected,
+            provenance,
+            temporal,
+            _q(
+                {
+                    **auth,
+                    "interface": wifi.interface,
+                    "ssid": wifi.ssid,
+                    "frequency_mhz": wifi.frequency_mhz,
+                    "ipv4": wifi.ipv4,
+                }
+            ),
+        )
+        if wifi.signal_dbm is not None:
+            yield _measurement(
+                subject=f"{entity.entity_id}:wifi-link",
+                predicate="wifi_signal",
+                value=wifi.signal_dbm,
+                provenance=provenance,
+                temporal=temporal,
+                quantity_kind="signal_level",
+                unit="dBm",
+                measurement_kind="wifi_link_telemetry",
+                identity_parts=(
+                    observed_at,
+                    wifi.interface,
+                    wifi.signal_dbm,
+                ),
+                qualifiers={
+                    **auth,
+                    "scale_type": "interval",
+                    "interface": wifi.interface,
+                },
+            )
+        for prop, value in (
+            ("wifi_rx_rate", wifi.rx_mbps),
+            ("wifi_tx_rate", wifi.tx_mbps),
+        ):
+            if value is not None:
+                yield _measurement(
+                    subject=f"{entity.entity_id}:wifi-link",
+                    predicate=prop,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    quantity_kind="data_rate",
+                    unit="megabit_per_second",
+                    measurement_kind="wifi_link_telemetry",
+                    identity_parts=(observed_at, wifi.interface, prop, value),
+                    qualifiers={
+                        **auth,
+                        "scale_type": "ratio",
+                        "interface": wifi.interface,
+                    },
+                )
+
+
+def _traffic_situation(
+    entity: Entity,
+    state: TrafficSituationState,
+) -> Iterable[SemanticAssertion]:
+    provenance = _derived_provenance(entity, "traffic.fusion")
     temporal = SemanticTemporalContext(derived_at=state.derived_at)
     for i, gap in enumerate(state.collection_gaps):
         proposition = _proposition(entity.entity_id, "collection-gap", i)
         yield SemanticAssertion(
-            _id(proposition, state.derived_at, gap), proposition,
-            SemanticKind.COLLECTION_GAP, "Collection gap", entity.entity_id, "known_collection_gap", gap,
-            provenance, temporal, _q({"derived_at": state.derived_at}),
+            _id(proposition, state.derived_at, gap),
+            proposition,
+            SemanticKind.COLLECTION_GAP,
+            "Collection gap",
+            entity.entity_id,
+            "known_collection_gap",
+            gap,
+            provenance,
+            temporal,
+            _q(
+                {
+                    "derived_at": state.derived_at,
+                    "semantic_authority_state": "locally_derived",
+                    "current_authority": True,
+                }
+            ),
         )
     for kernel in state.kernels:
         if kernel.association_basis == "same-lineage upstream identifier":
             subject = f"{entity.entity_id}:kernel:{kernel.kernel_id}"
-            records = tuple(_source(ref, SemanticSourceRole.SOURCE_RECORD, native_id=ref) for ref in kernel.source_record_refs)
-            kernel_provenance = SemanticProvenance(SemanticAssertionOrigin.CIC_DERIVED, (derivation, *records, world), derivation.ref_id)
-            proposition = _proposition(subject, "same_upstream_event_representation")
+            records = tuple(
+                _source(
+                    ref,
+                    SemanticSourceRole.SOURCE_RECORD,
+                    native_id=ref,
+                )
+                for ref in kernel.source_record_refs
+            )
+            derivation = _source(
+                "derivation:traffic.fusion",
+                SemanticSourceRole.DERIVATION_PROCESS,
+                native_id="traffic.fusion",
+            )
+            world = _source(
+                entity.entity_id,
+                SemanticSourceRole.WORLD_ENTITY_REFERENCE,
+                native_id=entity.entity_id,
+            )
+            kernel_provenance = SemanticProvenance(
+                SemanticAssertionOrigin.CIC_DERIVED,
+                (derivation, *records, world),
+                derivation.ref_id,
+            )
+            proposition = _proposition(
+                subject,
+                "same_upstream_event_representation",
+            )
             yield SemanticAssertion(
-                _id(proposition, state.derived_at, kernel.source_record_refs), proposition,
-                SemanticKind.IDENTITY_ASSOCIATION, "Identity assertion", subject, "same_upstream_event_representation",
-                kernel.source_record_refs, kernel_provenance, temporal,
-                _q({"mapping_strength": "same_lineage_identifier_only", "source_families": kernel.source_families,
-                    "not_independent_corroboration": True, "not_cross_lineage_equivalence": True, "not_causal_inference": True}),
+                _id(
+                    proposition,
+                    state.derived_at,
+                    kernel.source_record_refs,
+                ),
+                proposition,
+                SemanticKind.IDENTITY_ASSOCIATION,
+                "Identity assertion",
+                subject,
+                "same_upstream_event_representation",
+                kernel.source_record_refs,
+                kernel_provenance,
+                temporal,
+                _q(
+                    {
+                        "mapping_strength": "same_lineage_identifier_only",
+                        "source_families": kernel.source_families,
+                        "not_independent_corroboration": True,
+                        "not_cross_lineage_equivalence": True,
+                        "not_causal_inference": True,
+                        "semantic_authority_state": "locally_derived",
+                        "current_authority": True,
+                    }
+                ),
             )
 
 
 def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
-    out = []
+    out: list[SemanticAssertion] = []
     observation = entity.get(ObservationState)
     if observation is not None:
         out.extend(_observation(entity, observation))
+
     flow = entity.get(TrafficFlowCollectionState)
     if flow is not None:
         out.extend(_traffic_flow(entity, flow, observation))
+
+    traffic_events = entity.get(TrafficEventCollectionState)
+    if traffic_events is not None:
+        out.extend(_traffic_events(entity, traffic_events, observation))
+
+    weather = entity.get(WeatherState)
+    if weather is not None:
+        out.extend(_weather_state(entity, weather, observation))
+
+    surface = entity.get(SurfaceObservationNetworkState)
+    if surface is not None:
+        out.extend(_surface_network(entity, surface, observation))
+
+    estimate = entity.get(CurrentWeatherEstimateState)
+    if estimate is not None:
+        out.extend(_weather_estimate(entity, estimate))
+
+    alerts = entity.get(WeatherAlertState)
+    if alerts is not None:
+        out.extend(_weather_alerts(entity, alerts, observation))
+
     situation = entity.get(TrafficSituationState)
     if situation is not None:
         out.extend(_traffic_situation(entity, situation))
+
+    out.extend(_system_state(entity, observation))
     return tuple(out)
 
 
 def project_world_semantics(world: WorldState) -> tuple[SemanticAssertion, ...]:
-    out = []
+    out: list[SemanticAssertion] = []
     for entity_id in sorted(world.entities):
         out.extend(project_entity_semantics(world.entities[entity_id]))
     return tuple(out)

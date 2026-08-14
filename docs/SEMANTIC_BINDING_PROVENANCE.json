@@ -1,7 +1,7 @@
 {
   "source_artifact": "PERSONAL_CIC_036_003F_QA1_R2_AUTHORITATIVE_SOURCE_2026-08-13.tar.gz",
   "source_sha256": "c06e05389b35bdf0190ef6f54e3057b059d88b95b37e4691a6737b0450dd973f",
-  "integration": "003f semantic binding RC2 candidate",
+  "integration": "003f semantic binding RC3",
   "authority": "read-only additive semantic projection",
   "world_snapshot_schema_changed": false,
   "event_journal_schema_changed": false,
@@ -11,5 +11,16 @@
   "candidate_authority": "read-only additive semantic projection; not target-promoted",
   "semantic_assertion_envelope_changed": true,
   "typed_provenance_added": true,
-  "temporal_roles_added": true
+  "temporal_roles_added": true,
+  "parent_target_verified_commit": "d3876552f8a1f24ab37524c3fe7d5ec755c3b28f",
+  "parent_target_verified_tree": "3237ccf4f9c5bb06dd5eb915ac13fa5354249bde",
+  "parent_target_verified_tag": "slice-003f-semantic-binding-rc2-target-verified",
+  "authority_freshness_hardening": true,
+  "traffic_source_report_binding": true,
+  "scoped_negative_evidence_binding": true,
+  "data_product_quality_binding": true,
+  "weather_direct_vs_derived_binding": true,
+  "system_state_measurement_binding": true,
+  "topology_edges_added": false,
+  "topology_nonclaim_reason": "runtime component co-location does not prove an attached_to, powered_by, communicates_via, or equivalent topology relation"
 }

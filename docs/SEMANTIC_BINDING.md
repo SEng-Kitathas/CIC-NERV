@@ -1,25 +1,84 @@
-# 003f Semantic Binding RC2 Candidate
+# 003f Semantic Binding RC3
 
-Read-only semantic projection over existing CIC WorldState. RC2 retains RC1 authority boundaries and adds assertion-instance identity, stable proposition identity, typed provenance roles, and explicit temporal roles.
+RC3 extends the target-verified RC2 semantic spine without changing its identity,
+provenance, temporal, or read-only authority contracts.
 
-It does not mutate WorldState, change snapshot v2, alter materiality, write the event journal, add OWL/RDF runtime dependencies, perform entity resolution, infer confidence/causality, or promote unresolved provider-native semantics.
+```text
+provider / adapter
+    -> existing typed CIC components
+    -> WorldState (world authority)
+    -> read-only semantic projection
+```
 
-RC2 additions:
-- `proposition_key` identifies the stable proposition family independently from an assertion instance.
-- `assertion_id` includes observation/derivation instance context where available, so equal-valued observations at different collection times remain distinct assertions.
-- provenance distinguishes provider, adapter, source record, derivation process, world-entity reference, and future foreign-semantic authority roles.
-- temporal context distinguishes phenomenon/source/observed/retrieved/derived time; unknown roles remain unknown.
-- traffic-flow measurement assertions use the sibling `ObservationState.checked_at` as CIC observation time without pretending it is provider phenomenon/source time.
-- RC1 `source_refs` remains available as a compatibility projection over typed provenance.
-- qualifier mappings are read-only.
+No `WorldState` component changes. No snapshot/journal schema changes. No ontology
+runtime dependency is added.
 
-First bindings remain:
-- ObservationState -> Observation boundary.
-- UNAVAILABLE -> Absence assertion, explicitly not a negative world-state claim.
-- TrafficSituationState.collection_gaps -> Collection gap.
-- TomTom flow speed/travel time -> Measurement assertion.
-- same-lineage traffic kernels -> Identity association without corroboration/equivalence/causality transfer.
-- TomTom `confidence` -> Foreign semantic preservation with unresolved local role.
+## RC2 foundation preserved
 
-External ontology relationship:
-PROV-O, SOSA/SSN, OWL-Time, QUDT/OM, and other quarry donors remain external crosswalk authorities. RC2 adds no runtime ontology dependency and does not make foreign ontology resources sovereign over WorldState.
+- proposition identity remains distinct from assertion-instance identity;
+- provenance remains typed by provider / adapter / source-record / derivation / world reference;
+- phenomenon, source, observed/retrieved, and derived times remain role-bearing;
+- unknown time roles remain unknown;
+- qualifiers and semantic assertions remain read-only;
+- provider-native TomTom confidence remains unresolved foreign semantics.
+
+## RC3 promoted runtime bindings
+
+### Authority / freshness
+
+CIC intentionally retains last-known components after collection loss. RC3 therefore
+projects semantic authority independently from component presence:
+
+- `current`
+- `degraded_or_mixed`
+- `retained_by_policy`
+- `last_known_noncurrent`
+- `unscoped`
+- `locally_derived`
+
+**LAST-KNOWN STATE IS NOT CURRENT STATE.**
+
+### Traffic reports and evidence
+
+A `TrafficEventObservation` is projected as a source report, not as identity for a
+world event. Event start time is phenomenon time; provider report/update time remains
+source time; CIC collection check time remains observed-at time.
+
+A CURRENT successfully empty event collection can provide scoped negative evidence
+for that provider/source-family/scope only.
+
+**EVENT RECORD IS NOT WORLD EVENT.**
+**REPORT IS NOT CAUSATION.**
+**CURRENT EMPTY COLLECTION IS NOT UNIVERSAL ABSENCE.**
+
+### Measurement and data-product quality
+
+TomTom successful/configured probe fraction is projected as collection-completeness
+quality, separate from provider confidence, source reliability, and claim confidence.
+
+Station observations and provider current weather values are measurements. The
+current-weather fusion product is a CIC-derived estimate and is not re-labeled as a
+direct observation.
+
+**DATA-PRODUCT QUALITY IS NOT CLAIM CONFIDENCE OR SOURCE RELIABILITY.**
+**DIRECT OBSERVATION IS NOT DERIVED ESTIMATE.**
+
+### System state
+
+- `HealthState` -> derived State condition.
+- CPU / memory / storage / temperature -> Measurement assertion.
+- USB presence -> State condition.
+- Wi-Fi connectivity -> State condition.
+- Wi-Fi signal / rates -> Measurement assertion.
+
+**DERIVED HEALTH IS NOT RAW TELEMETRY.**
+**CONNECTIVITY STATE IS NOT SIGNAL MEASUREMENT.**
+
+## Explicit non-promotion
+
+RC3 does not create topology edges from component co-location in an Entity.
+
+**COMPONENT CO-LOCATION IS NOT A PROVED TOPOLOGY EDGE.**
+
+It also does not introduce source-reliability scores, causal assertions, foreign
+ontology IRIs, or graph persistence. Those require independent runtime pressure.

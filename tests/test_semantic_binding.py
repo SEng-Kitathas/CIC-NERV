@@ -82,3 +82,126 @@ class SemanticBindingRC2Tests(unittest.TestCase):
     def test_semantic_qualifiers_are_read_only(self):
         a=self._current_speed(self._world())
         with self.assertRaises(TypeError): a.qualifiers["unit"]="kilometer_per_hour"
+
+
+
+class SemanticBindingRC3Tests(unittest.TestCase):
+    def _flow_world(self, availability=ObservationAvailability.CURRENT, checked_at="t2"):
+        w=WorldState(EventBus()); w.ensure_entity("traffic-flow","Traffic Flow")
+        w.upsert_component("traffic-flow",ObservationState("tomtom.flow",availability,checked_at,"t2",(() if availability is ObservationAvailability.CURRENT else ("collector state changed",))))
+        w.upsert_component("traffic-flow",TrafficFlowCollectionState("Test","TomTom","tomtom","commercial_modeled_telemetry",35,-80,10,2,1,
+            (TrafficFlowProbeObservation("p1","query ref","tomtom","TomTom","commercial_modeled_telemetry",35,-80,
+             "nearest_road_fragment_to_query_point","FRC2",42.0,60.0,90,60,0.91,False,"abc",()),)))
+        return w
+
+    def test_retained_flow_state_loses_current_authority_when_collector_unavailable(self):
+        a=next(x for x in project_world_semantics(self._flow_world(ObservationAvailability.UNAVAILABLE,"t3")) if x.predicate=="current_speed")
+        self.assertEqual(a.qualifiers["semantic_authority_state"],"last_known_noncurrent")
+        self.assertFalse(a.qualifiers["current_authority"])
+        self.assertEqual(a.temporal.observed_at,"t3")
+
+    def test_degraded_flow_state_is_qualified_not_clean_current(self):
+        a=next(x for x in project_world_semantics(self._flow_world(ObservationAvailability.DEGRADED,"t3")) if x.predicate=="current_speed")
+        self.assertEqual(a.qualifiers["semantic_authority_state"],"degraded_or_mixed")
+        self.assertEqual(a.qualifiers["current_authority"],"qualified")
+
+    def test_probe_success_fraction_is_data_quality_not_confidence(self):
+        a=next(x for x in project_world_semantics(self._flow_world()) if x.predicate=="probe_collection_completeness")
+        self.assertEqual(a.kind,SemanticKind.DATA_QUALITY)
+        self.assertEqual(a.value,0.5)
+        self.assertTrue(a.qualifiers["not_claim_confidence"])
+        self.assertTrue(a.qualifiers["not_source_reliability"])
+
+    def test_event_record_is_report_not_world_event_identity_with_role_times(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("wzdx",ObservationAvailability.CURRENT,"retrieval-t2","retrieval-t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","WZDx","wzdx","official_exchange",35,-80,10,1,1,"source-t1",
+            (TrafficEventObservation("r1","wzdx","WZDx","official_exchange","incident",None,"Crash","I-485","N","Mecklenburg",(),
+             "reported-t0","updated-t1","start-t0","end-t3","major",True),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_event_record")
+        self.assertEqual(a.kind,SemanticKind.SOURCE_REPORT)
+        self.assertTrue(a.qualifiers["record_is_not_world_event_identity"])
+        self.assertTrue(a.qualifiers["report_does_not_establish_causality"])
+        self.assertEqual(a.temporal.phenomenon_time,"start-t0")
+        self.assertEqual(a.temporal.source_time,"updated-t1")
+        self.assertEqual(a.temporal.observed_at,"retrieval-t2")
+
+    def test_current_empty_collection_is_scoped_negative_evidence(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("drivenc",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","NCDOT","drivenc","official",35,-80,10,0,0,"t2",()))
+        a=next(x for x in project_world_semantics(w) if x.kind is SemanticKind.EVIDENCE)
+        self.assertTrue(a.value)
+        self.assertTrue(a.qualifiers["not_universal_event_absence"])
+
+    def test_surface_station_is_direct_but_current_estimate_is_derived(self):
+        from personal_cic.core.world.components import CurrentWeatherEstimateState, SurfaceObservationNetworkState, SurfaceStationObservation
+        w=WorldState(EventBus()); w.ensure_entity("surface","Surface")
+        w.upsert_component("surface",ObservationState("aviation.surface",ObservationAvailability.CURRENT,"retrieval-t2","retrieval-t2"))
+        w.upsert_component("surface",SurfaceObservationNetworkState("Test","AviationWeather","station-t1","KCLT",1,70.0,60.0,55.0,0.0,
+            (SurfaceStationObservation("KCLT","Charlotte","station-t1",35.2,-80.9,5.0,70.0,60.0,55.0,180.0,10.0,None,10.0,30.01,1016.0,5000,"VFR",None,None),)))
+        w.ensure_entity("estimate","Estimate")
+        w.upsert_component("estimate",CurrentWeatherEstimateState("Test","derived-t3","surface_primary","aviation_surface",1,70.0,60.0,55.0,180.0,10.0,None,10.0,30.01,5000,"VFR",0.0,None,None,None,None,None))
+        assertions=project_world_semantics(w)
+        station=next(x for x in assertions if x.subject_ref.endswith("surface-station:KCLT") and x.predicate=="temperature")
+        estimate=next(x for x in assertions if x.subject_ref.endswith("current-weather-estimate") and x.predicate=="temperature")
+        self.assertEqual(station.qualifiers["measurement_kind"],"direct_station_observation")
+        self.assertEqual(station.temporal.phenomenon_time,"station-t1")
+        self.assertEqual(station.temporal.observed_at,"retrieval-t2")
+        self.assertEqual(estimate.qualifiers["measurement_kind"],"derived_estimate")
+        self.assertEqual(estimate.temporal.derived_at,"derived-t3")
+        self.assertTrue(estimate.qualifiers["not_direct_observation"])
+
+    def test_weather_alert_is_provider_report_not_hazard_identity(self):
+        from personal_cic.core.world.components import WeatherAlertState, WeatherAlertSummary
+        w=WorldState(EventBus()); w.ensure_entity("alerts","Alerts")
+        w.upsert_component("alerts",ObservationState("nws.alerts",ObservationAvailability.CURRENT,"retrieval-t3","retrieval-t3"))
+        w.upsert_component("alerts",WeatherAlertState("Test","NWS",1,"Severe","provider-updated",
+            (WeatherAlertSummary("a1","Severe Thunderstorm Warning","Severe","Immediate","headline","sent-t0","effective-t1","expires-t4"),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_alert")
+        self.assertEqual(a.kind,SemanticKind.SOURCE_REPORT)
+        self.assertTrue(a.qualifiers["record_is_not_hazard_identity"])
+        self.assertEqual(a.temporal.source_time,"sent-t0")
+        self.assertEqual(a.temporal.phenomenon_time,"effective-t1")
+        self.assertEqual(a.temporal.observed_at,"retrieval-t3")
+
+    def test_health_is_derived_condition_while_cpu_is_measurement(self):
+        from personal_cic.core.world.components import ComputeState, HealthState, HealthStatus
+        from personal_cic.semantics import SemanticAssertionOrigin
+        w=WorldState(EventBus()); w.ensure_entity("host","Host")
+        w.upsert_component("host",ObservationState("linux.host",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("host",ComputeState(10.0,4,0.5,0.125))
+        w.upsert_component("host",HealthState(HealthStatus.NOMINAL,()))
+        assertions=project_world_semantics(w)
+        health=next(x for x in assertions if x.predicate=="health_status")
+        cpu=next(x for x in assertions if x.predicate=="cpu_utilization")
+        self.assertEqual(health.kind,SemanticKind.STATE_CONDITION)
+        self.assertEqual(health.provenance.origin,SemanticAssertionOrigin.CIC_DERIVED)
+        self.assertTrue(health.qualifiers["health_is_not_raw_telemetry"])
+        self.assertEqual(cpu.kind,SemanticKind.MEASUREMENT)
+
+    def test_usb_absence_inherits_collection_authority(self):
+        from personal_cic.core.world.components import UsbDeviceState
+        w=WorldState(EventBus()); w.ensure_entity("radio","Radio")
+        w.upsert_component("radio",ObservationState("tenda.u11_pro",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("radio",UsbDeviceState(False,None,None,"absent"))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="usb_device_present")
+        self.assertFalse(a.value); self.assertTrue(a.qualifiers["current_authority"])
+        w.upsert_component("radio",ObservationState("tenda.u11_pro",ObservationAvailability.UNAVAILABLE,"t3","t2",("lsusb failed",)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="usb_device_present")
+        self.assertFalse(a.qualifiers["current_authority"])
+
+    def test_wifi_connectivity_state_and_signal_measurement_do_not_collapse(self):
+        from personal_cic.core.world.components import WifiLinkState
+        w=WorldState(EventBus()); w.ensure_entity("radio","Radio")
+        w.upsert_component("radio",ObservationState("tenda.u11_pro",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("radio",WifiLinkState("wlan0",True,"ssid",5180,-48,100.0,80.0,"10.0.0.2/24"))
+        assertions=project_world_semantics(w)
+        state=next(x for x in assertions if x.predicate=="wifi_connected")
+        signal=next(x for x in assertions if x.predicate=="wifi_signal")
+        self.assertEqual(state.kind,SemanticKind.STATE_CONDITION)
+        self.assertEqual(signal.kind,SemanticKind.MEASUREMENT)
+        self.assertEqual(signal.qualifiers["unit"],"dBm")
+

@@ -10,6 +10,11 @@ class SemanticKind(str, Enum):
     ABSENCE = "absence"
     COLLECTION_GAP = "collection_gap"
     MEASUREMENT = "measurement"
+    DATA_QUALITY = "data_quality"
+    SOURCE_REPORT = "source_report"
+    TEMPORAL = "temporal"
+    EVIDENCE = "evidence"
+    STATE_CONDITION = "state_condition"
     IDENTITY_ASSOCIATION = "identity_association"
     FOREIGN_NATIVE = "foreign_native"
 
