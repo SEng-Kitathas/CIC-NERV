@@ -14,6 +14,7 @@ class SemanticKind(str, Enum):
     SOURCE_REPORT = "source_report"
     PREDICTION = "prediction"
     INFORMATION_ARTIFACT = "information_artifact"
+    SPATIAL = "spatial"
     TEMPORAL = "temporal"
     EVIDENCE = "evidence"
     STATE_CONDITION = "state_condition"

@@ -103,3 +103,41 @@ process.
 **CAMERA RECORD IS NOT CAMERA OBSERVATION RESULT.**
 **MESSAGE TEXT IS NOT EVENT TRUTH.**
 
+## RC5 — Spatial Roles + Geometry Authority
+
+RC5 is the first runtime-earned promotion of a native `Spatial assertion` semantic
+home. It does not import GeoSPARQL, run spatial inference, or create automatic
+identity/correlation edges. It names spatial roles that CIC already materially
+distinguishes.
+
+Promoted roles include:
+
+- collection scope center + radius;
+- acquisition query/reference point;
+- provider-matched road geometry;
+- source-reported event geometry;
+- provider-reported infrastructure point;
+- radar product coverage envelope;
+- reference-context coverage envelope;
+- derived traffic-awareness scope.
+
+Constitutional firewalls:
+
+**COLLECTION SCOPE IS NOT OBJECT LOCATION.**
+
+**QUERY POINT IS NOT MATCHED GEOMETRY.**
+
+**REPORTED GEOMETRY IS NOT ENTITY IDENTITY.**
+
+**SHARED OR INTERSECTING GEOMETRY DOES NOT ESTABLISH SAME EVENT.**
+
+**RADAR PRODUCT EXTENT IS NOT STORM FOOTPRINT.**
+
+**REFERENCE GEOMETRY DOES NOT ACQUIRE METEOROLOGICAL OR TRAFFIC AUTHORITY BY CO-RENDERING.**
+
+**INFRASTRUCTURE LOCATION IS NOT SENSOR FIELD OF VIEW, OBSERVATION RESULT, MESSAGE CONTENT LOCATION, OR EVENT LOCATION.**
+
+The runtime remains deliberately non-inferential: RC5 preserves and labels geometry
+so later association engines can reason from explicit spatial roles without first
+having to recover what each coordinate meant.
+

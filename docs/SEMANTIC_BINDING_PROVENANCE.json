@@ -1,7 +1,7 @@
 {
   "source_artifact": "PERSONAL_CIC_036_003F_QA1_R2_AUTHORITATIVE_SOURCE_2026-08-13.tar.gz",
   "source_sha256": "c06e05389b35bdf0190ef6f54e3057b059d88b95b37e4691a6737b0450dd973f",
-  "integration": "003f semantic binding RC4",
+  "integration": "003f semantic binding RC5",
   "authority": "read-only additive semantic projection",
   "world_snapshot_schema_changed": false,
   "event_journal_schema_changed": false,
@@ -12,9 +12,9 @@
   "semantic_assertion_envelope_changed": true,
   "typed_provenance_added": true,
   "temporal_roles_added": true,
-  "parent_target_verified_commit": "096f3af68dbf34c2bf9201988d737c19e7789d74",
-  "parent_target_verified_tree": "1878b58f557a7982fcc61ed673b138c4fe4e4b81",
-  "parent_target_verified_tag": "slice-003f-semantic-binding-rc3-target-verified",
+  "parent_target_verified_commit": "186abde40934325c1d1ab5e4d8319e45e3d3bfc1",
+  "parent_target_verified_tree": "0168bfb7e89e8749bc972ed4a97e8ce18556d1a9",
+  "parent_target_verified_tag": "slice-003f-semantic-binding-rc4-target-verified",
   "authority_freshness_hardening": true,
   "traffic_source_report_binding": true,
   "scoped_negative_evidence_binding": true,
@@ -27,5 +27,15 @@
   "information_artifact_boundary": true,
   "radar_artifact_binding": true,
   "traffic_camera_artifact_binding": true,
-  "traffic_message_sign_artifact_binding": true
+  "traffic_message_sign_artifact_binding": true,
+  "runtime_earned_spatial_home": true,
+  "spatial_role_binding": true,
+  "collection_scope_binding": true,
+  "query_vs_matched_geometry_binding": true,
+  "reported_event_geometry_binding": true,
+  "infrastructure_location_binding": true,
+  "radar_extent_binding": true,
+  "reference_geometry_authority_firewall": true,
+  "spatial_inference_engine_added": false,
+  "geosparql_runtime_dependency_added": false
 }

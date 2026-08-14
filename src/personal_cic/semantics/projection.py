@@ -195,6 +195,84 @@ def _measurement(
     )
 
 
+
+
+def _point(latitude: float, longitude: float) -> tuple[float, float]:
+    return (float(latitude), float(longitude))
+
+
+def _line_geometry(points: Iterable[object]) -> tuple[tuple[float, float], ...]:
+    return tuple(
+        (float(point.latitude), float(point.longitude))
+        for point in points
+    )
+
+
+def _spatial_assertion(
+    *,
+    subject: str,
+    predicate: str,
+    value: object,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    identity_parts: tuple[object, ...],
+    spatial_role: str,
+    qualifiers: Mapping[str, Any] | None = None,
+) -> SemanticAssertion:
+    proposition = _proposition(subject, predicate)
+    values: dict[str, Any] = {
+        "spatial_role": spatial_role,
+        "crs": "EPSG:4326",
+        "coordinate_order": "latitude_longitude",
+        "no_spatial_identity_inference": True,
+        "no_intersection_equivalence_inference": True,
+    }
+    if qualifiers:
+        values.update(qualifiers)
+    return SemanticAssertion(
+        _id(proposition, *identity_parts),
+        proposition,
+        SemanticKind.SPATIAL,
+        "Spatial assertion",
+        subject,
+        predicate,
+        value,
+        provenance,
+        temporal,
+        _q(values),
+    )
+
+
+def _collection_scope_assertion(
+    *,
+    subject: str,
+    center_latitude: float,
+    center_longitude: float,
+    radius_miles: float,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    identity_parts: tuple[object, ...],
+    qualifiers: Mapping[str, Any] | None = None,
+) -> SemanticAssertion:
+    extra = {
+        "radius_miles": radius_miles,
+        "scope_is_not_object_location": True,
+        "scope_is_not_event_geometry": True,
+    }
+    if qualifiers:
+        extra.update(qualifiers)
+    return _spatial_assertion(
+        subject=subject,
+        predicate="collection_scope",
+        value=_point(center_latitude, center_longitude),
+        provenance=provenance,
+        temporal=temporal,
+        identity_parts=identity_parts,
+        spatial_role="collection_scope_center_and_radius",
+        qualifiers=extra,
+    )
+
+
 def _observation(entity: Entity, state: ObservationState) -> Iterable[SemanticAssertion]:
     adapter = _source(
         f"adapter:{state.adapter_id}",
@@ -267,6 +345,22 @@ def _traffic_flow(
     collection_subject = f"{entity.entity_id}:flow-collection:{state.provider}"
     collection_provenance = _provider_provenance(entity, state.provider, observation)
 
+    yield _collection_scope_assertion(
+        subject=collection_subject,
+        center_latitude=state.scope_center_latitude,
+        center_longitude=state.scope_center_longitude,
+        radius_miles=state.scope_radius_miles,
+        provenance=collection_provenance,
+        temporal=SemanticTemporalContext(observed_at=observed_at),
+        identity_parts=(
+            observed_at,
+            state.scope_center_latitude,
+            state.scope_center_longitude,
+            state.scope_radius_miles,
+        ),
+        qualifiers={**auth, "provider": state.provider},
+    )
+
     if state.configured_probe_count > 0:
         proposition = _proposition(collection_subject, "probe_collection_completeness")
         yield SemanticAssertion(
@@ -316,6 +410,50 @@ def _traffic_flow(
             "match_method": probe.match_method,
             "openlr": probe.openlr,
         }
+
+        yield _spatial_assertion(
+            subject=subject,
+            predicate="flow_query_point",
+            value=_point(probe.query_latitude, probe.query_longitude),
+            provenance=provenance,
+            temporal=temporal,
+            identity_parts=(
+                observed_at,
+                probe.query_latitude,
+                probe.query_longitude,
+                probe.probe_id,
+            ),
+            spatial_role="acquisition_query_reference_point",
+            qualifiers={
+                **common,
+                "query_point_is_not_matched_segment_geometry": True,
+                "query_point_is_not_road_identity": True,
+            },
+        )
+
+        if probe.geometry:
+            matched_geometry = _line_geometry(probe.geometry)
+            yield _spatial_assertion(
+                subject=subject,
+                predicate="matched_road_geometry",
+                value=matched_geometry,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(
+                    observed_at,
+                    probe.probe_id,
+                    matched_geometry,
+                    probe.openlr,
+                ),
+                spatial_role="provider_matched_road_geometry",
+                qualifiers={
+                    **common,
+                    "matched_geometry_is_not_query_point": True,
+                    "matched_geometry_is_not_exact_road_identity": True,
+                    "openlr_is_provider_segment_reference": probe.openlr is not None,
+                },
+            )
+
         for prop, value, qk, unit in (
             ("current_speed", probe.current_speed_mph, "velocity", "mile_per_hour"),
             ("free_flow_speed", probe.free_flow_speed_mph, "velocity", "mile_per_hour"),
@@ -386,6 +524,26 @@ def _traffic_events(
     collection_ref = f"{entity.entity_id}:event-collection:{state.source_family}"
     collection_provenance = _provider_provenance(entity, state.provider, observation)
 
+    yield _collection_scope_assertion(
+        subject=collection_ref,
+        center_latitude=state.scope_center_latitude,
+        center_longitude=state.scope_center_longitude,
+        radius_miles=state.scope_radius_miles,
+        provenance=collection_provenance,
+        temporal=SemanticTemporalContext(observed_at=observed_at),
+        identity_parts=(
+            observed_at,
+            state.scope_center_latitude,
+            state.scope_center_longitude,
+            state.scope_radius_miles,
+        ),
+        qualifiers={
+            **auth,
+            "provider": state.provider,
+            "source_family": state.source_family,
+        },
+    )
+
     if (
         observation is not None
         and observation.availability is ObservationAvailability.CURRENT
@@ -441,6 +599,31 @@ def _traffic_events(
             source_time=source_time,
             observed_at=observed_at,
         )
+
+        if event.geometry:
+            reported_geometry = _line_geometry(event.geometry)
+            yield _spatial_assertion(
+                subject=record_ref,
+                predicate="reported_event_geometry",
+                value=reported_geometry,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(
+                    event.source_record_id,
+                    source_time,
+                    observed_at,
+                    reported_geometry,
+                ),
+                spatial_role="source_reported_event_geometry",
+                qualifiers={
+                    **auth,
+                    "provider": event.provider,
+                    "source_family": event.source_family,
+                    "record_geometry_is_not_world_event_identity": True,
+                    "shared_geometry_does_not_establish_same_event": True,
+                },
+            )
+
         proposition = _proposition(record_ref, "provider_reports_event_record")
         yield SemanticAssertion(
             _id(
@@ -1147,6 +1330,49 @@ def _radar_mosaic(
     )
 
 
+
+
+def _radar_mosaic_spatial(
+    entity: Entity,
+    state: RadarMosaicState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    observed_at = observation.checked_at if observation is not None else None
+    provenance = _provider_provenance(entity, state.provider, observation)
+    subject = f"{entity.entity_id}:radar-mosaic:{state.product}:{state.layer}"
+    temporal = SemanticTemporalContext(
+        source_time=state.stream_latest_at,
+        retrieved_at=state.frame_retrieved_at or observed_at,
+        observed_at=observed_at,
+    )
+    envelope = (
+        float(state.west),
+        float(state.south),
+        float(state.east),
+        float(state.north),
+    )
+    yield _spatial_assertion(
+        subject=subject,
+        predicate="radar_product_coverage",
+        value=envelope,
+        provenance=provenance,
+        temporal=temporal,
+        identity_parts=(
+            state.image_sha256,
+            state.stream_latest_at,
+            envelope,
+        ),
+        spatial_role="product_coverage_envelope",
+        qualifiers={
+            **_authority_qualifiers(observation),
+            "coordinate_order": "west_south_east_north",
+            "range_miles": state.range_miles,
+            "coverage_is_not_storm_footprint": True,
+            "coverage_is_not_warning_geometry": True,
+        },
+    )
+
+
 def _radar_context(
     entity: Entity,
     state: RadarContextState,
@@ -1184,12 +1410,65 @@ def _radar_context(
     )
 
 
+
+
+def _radar_context_spatial(
+    entity: Entity,
+    state: RadarContextState,
+    observation: ObservationState | None,
+) -> Iterable[SemanticAssertion]:
+    provenance = _provider_provenance(entity, state.provider, observation)
+    subject = f"{entity.entity_id}:radar-context"
+    envelope = (
+        float(state.west),
+        float(state.south),
+        float(state.east),
+        float(state.north),
+    )
+    yield _spatial_assertion(
+        subject=subject,
+        predicate="reference_context_coverage",
+        value=envelope,
+        provenance=provenance,
+        temporal=SemanticTemporalContext(retrieved_at=state.retrieved_at),
+        identity_parts=(state.context_sha256, state.retrieved_at, envelope),
+        spatial_role="reference_context_envelope",
+        qualifiers={
+            **_authority_qualifiers(observation),
+            "coordinate_order": "west_south_east_north",
+            "reference_geometry_has_no_meteorological_authority": True,
+            "reference_geometry_has_no_traffic_event_authority": True,
+        },
+    )
+
+
 def _traffic_cameras(
     entity: Entity,
     state: TrafficCameraCollectionState,
     observation: ObservationState | None,
 ) -> Iterable[SemanticAssertion]:
     observed_at = observation.checked_at if observation is not None else None
+    collection_subject = f"{entity.entity_id}:camera-collection:{state.source_family}"
+    collection_provenance = _provider_provenance(entity, state.provider, observation)
+    yield _collection_scope_assertion(
+        subject=collection_subject,
+        center_latitude=state.scope_center_latitude,
+        center_longitude=state.scope_center_longitude,
+        radius_miles=state.scope_radius_miles,
+        provenance=collection_provenance,
+        temporal=SemanticTemporalContext(observed_at=observed_at),
+        identity_parts=(
+            observed_at,
+            state.scope_center_latitude,
+            state.scope_center_longitude,
+            state.scope_radius_miles,
+        ),
+        qualifiers={
+            **_authority_qualifiers(observation),
+            "provider": state.provider,
+            "source_family": state.source_family,
+        },
+    )
     for camera in state.cameras:
         subject = f"{entity.entity_id}:camera-record:{camera.camera_id}"
         provenance = _provider_provenance(
@@ -1197,6 +1476,26 @@ def _traffic_cameras(
             record_ref=subject, native_record_id=camera.camera_id,
         )
         temporal = SemanticTemporalContext(observed_at=observed_at)
+        yield _spatial_assertion(
+            subject=subject,
+            predicate="reported_infrastructure_location",
+            value=_point(camera.latitude, camera.longitude),
+            provenance=provenance,
+            temporal=temporal,
+            identity_parts=(
+                observed_at,
+                camera.camera_id,
+                camera.latitude,
+                camera.longitude,
+            ),
+            spatial_role="provider_reported_infrastructure_point",
+            qualifiers={
+                **_authority_qualifiers(observation),
+                "infrastructure_type": "traffic_camera",
+                "location_is_not_visual_observation_result": True,
+                "location_does_not_assert_camera_field_of_view": True,
+            },
+        )
         proposition = _proposition(subject, "provider_reports_camera")
         yield SemanticAssertion(
             _id(proposition, observed_at, camera.camera_id, camera.status, camera.video_url),
@@ -1235,6 +1534,27 @@ def _traffic_message_signs(
     observation: ObservationState | None,
 ) -> Iterable[SemanticAssertion]:
     observed_at = observation.checked_at if observation is not None else None
+    collection_subject = f"{entity.entity_id}:message-sign-collection:{state.source_family}"
+    collection_provenance = _provider_provenance(entity, state.provider, observation)
+    yield _collection_scope_assertion(
+        subject=collection_subject,
+        center_latitude=state.scope_center_latitude,
+        center_longitude=state.scope_center_longitude,
+        radius_miles=state.scope_radius_miles,
+        provenance=collection_provenance,
+        temporal=SemanticTemporalContext(observed_at=observed_at),
+        identity_parts=(
+            observed_at,
+            state.scope_center_latitude,
+            state.scope_center_longitude,
+            state.scope_radius_miles,
+        ),
+        qualifiers={
+            **_authority_qualifiers(observation),
+            "provider": state.provider,
+            "source_family": state.source_family,
+        },
+    )
     for sign in state.signs:
         subject = f"{entity.entity_id}:message-sign-record:{sign.sign_id}"
         provenance = _provider_provenance(
@@ -1244,6 +1564,27 @@ def _traffic_message_signs(
         temporal = SemanticTemporalContext(
             source_time=sign.updated_at,
             observed_at=observed_at,
+        )
+        yield _spatial_assertion(
+            subject=subject,
+            predicate="reported_infrastructure_location",
+            value=_point(sign.latitude, sign.longitude),
+            provenance=provenance,
+            temporal=temporal,
+            identity_parts=(
+                sign.updated_at,
+                observed_at,
+                sign.sign_id,
+                sign.latitude,
+                sign.longitude,
+            ),
+            spatial_role="provider_reported_infrastructure_point",
+            qualifiers={
+                **_authority_qualifiers(observation),
+                "infrastructure_type": "dynamic_message_sign",
+                "location_is_not_message_content_location": True,
+                "location_does_not_assert_event_location": True,
+            },
         )
         proposition = _proposition(subject, "provider_reports_message_sign")
         yield SemanticAssertion(
@@ -1277,6 +1618,28 @@ def _traffic_situation(
 ) -> Iterable[SemanticAssertion]:
     provenance = _derived_provenance(entity, "traffic.fusion")
     temporal = SemanticTemporalContext(derived_at=state.derived_at)
+
+    yield _collection_scope_assertion(
+        subject=f"{entity.entity_id}:traffic-situation-scope",
+        center_latitude=state.scope_center_latitude,
+        center_longitude=state.scope_center_longitude,
+        radius_miles=state.scope_radius_miles,
+        provenance=provenance,
+        temporal=temporal,
+        identity_parts=(
+            state.derived_at,
+            state.scope_center_latitude,
+            state.scope_center_longitude,
+            state.scope_radius_miles,
+        ),
+        qualifiers={
+            "semantic_authority_state": "locally_derived",
+            "current_authority": True,
+            "scope_is_awareness_domain": True,
+            "scope_is_not_event_location": True,
+        },
+    )
+
     for i, gap in enumerate(state.collection_gaps):
         proposition = _proposition(entity.entity_id, "collection-gap", i)
         yield SemanticAssertion(
@@ -1396,10 +1759,12 @@ def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
     radar = entity.get(RadarMosaicState)
     if radar is not None:
         out.extend(_radar_mosaic(entity, radar, observation))
+        out.extend(_radar_mosaic_spatial(entity, radar, observation))
 
     radar_context = entity.get(RadarContextState)
     if radar_context is not None:
         out.extend(_radar_context(entity, radar_context, observation))
+        out.extend(_radar_context_spatial(entity, radar_context, observation))
 
     cameras = entity.get(TrafficCameraCollectionState)
     if cameras is not None:

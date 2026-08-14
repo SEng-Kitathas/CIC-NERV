@@ -278,3 +278,134 @@ class SemanticBindingRC4Tests(unittest.TestCase):
         self.assertEqual(a.temporal.source_time,"source-t1")
         self.assertEqual(a.temporal.observed_at,"retrieved-t2")
 
+
+
+class SemanticBindingRC5Tests(unittest.TestCase):
+    def test_event_geometry_is_source_reported_spatial_role_not_event_identity(self):
+        from personal_cic.core.world.components import GeoPoint, TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("wzdx",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("events",TrafficEventCollectionState(
+            "Test","WZDx","wzdx","official_exchange",35.0,-80.0,10.0,1,1,"source-t1",
+            (TrafficEventObservation(
+                source_record_id="r1",source_family="wzdx",provider="WZDx",collection_class="official_exchange",
+                event_type="incident",event_subtype=None,description="Crash",roadway="I-485",direction="N",county="Mecklenburg",
+                geometry=(GeoPoint(35.10,-80.80),GeoPoint(35.11,-80.79)),
+                reported_at="reported-t0",updated_at="updated-t1",start_at="start-t0"
+            ),)
+        ))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="reported_event_geometry")
+        self.assertEqual(a.kind,SemanticKind.SPATIAL)
+        self.assertEqual(a.home,"Spatial assertion")
+        self.assertEqual(a.qualifiers["spatial_role"],"source_reported_event_geometry")
+        self.assertTrue(a.qualifiers["record_geometry_is_not_world_event_identity"])
+        self.assertTrue(a.qualifiers["shared_geometry_does_not_establish_same_event"])
+
+    def test_flow_query_point_and_matched_geometry_remain_distinct_spatial_roles(self):
+        from personal_cic.core.world.components import GeoPoint, TrafficFlowCollectionState, TrafficFlowProbeObservation
+        w=WorldState(EventBus()); w.ensure_entity("flow","Flow")
+        w.upsert_component("flow",ObservationState("tomtom.flow",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("flow",TrafficFlowCollectionState(
+            "Test","TomTom","tomtom","commercial_modeled_telemetry",35.0,-80.0,10.0,1,1,
+            (TrafficFlowProbeObservation(
+                probe_id="p1",label="query",source_family="tomtom",provider="TomTom",
+                collection_class="commercial_modeled_telemetry",query_latitude=35.20,query_longitude=-80.70,
+                match_method="nearest_road_fragment_to_query_point",functional_road_class="FRC2",
+                current_speed_mph=42.0,free_flow_speed_mph=60.0,current_travel_time_seconds=90,
+                free_flow_travel_time_seconds=60,confidence=0.9,road_closure=False,openlr="segment",
+                geometry=(GeoPoint(35.21,-80.69),GeoPoint(35.22,-80.68)),
+            ),)
+        ))
+        assertions=project_world_semantics(w)
+        query=next(x for x in assertions if x.predicate=="flow_query_point")
+        matched=next(x for x in assertions if x.predicate=="matched_road_geometry")
+        self.assertEqual(query.kind,SemanticKind.SPATIAL)
+        self.assertEqual(matched.kind,SemanticKind.SPATIAL)
+        self.assertNotEqual(query.proposition_key,matched.proposition_key)
+        self.assertEqual(query.qualifiers["spatial_role"],"acquisition_query_reference_point")
+        self.assertEqual(matched.qualifiers["spatial_role"],"provider_matched_road_geometry")
+        self.assertTrue(query.qualifiers["query_point_is_not_matched_segment_geometry"])
+        self.assertTrue(matched.qualifiers["matched_geometry_is_not_query_point"])
+
+    def test_shared_event_geometry_does_not_create_identity_association(self):
+        from personal_cic.core.world.components import GeoPoint, TrafficEventCollectionState, TrafficEventObservation
+        geom=(GeoPoint(35.1,-80.8),GeoPoint(35.11,-80.79))
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("source",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("events",TrafficEventCollectionState(
+            "Test","Provider","family","official",35,-80,10,2,2,"t1",
+            (
+                TrafficEventObservation("a","family","Provider","official","incident",None,"A","Road",None,None,geom),
+                TrafficEventObservation("b","family","Provider","official","incident",None,"B","Road",None,None,geom),
+            )
+        ))
+        assertions=project_world_semantics(w)
+        spatial=[x for x in assertions if x.predicate=="reported_event_geometry"]
+        identities=[x for x in assertions if x.kind is SemanticKind.IDENTITY_ASSOCIATION]
+        self.assertEqual(len(spatial),2)
+        self.assertEqual(identities,[])
+
+    def test_collection_scope_is_not_object_or_event_location(self):
+        from personal_cic.core.world.components import TrafficCameraCollectionState
+        w=WorldState(EventBus()); w.ensure_entity("cams","Cameras")
+        w.upsert_component("cams",ObservationState("cams",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("cams",TrafficCameraCollectionState("Test","NCDOT","drivenc",35.0,-80.0,12.5,0,0,()))
+        scope=next(x for x in project_world_semantics(w) if x.subject_ref.endswith("camera-collection:drivenc") and x.predicate=="collection_scope")
+        self.assertEqual(scope.kind,SemanticKind.SPATIAL)
+        self.assertEqual(scope.qualifiers["spatial_role"],"collection_scope_center_and_radius")
+        self.assertTrue(scope.qualifiers["scope_is_not_object_location"])
+        self.assertTrue(scope.qualifiers["scope_is_not_event_geometry"])
+        self.assertEqual(scope.qualifiers["radius_miles"],12.5)
+
+    def test_radar_product_coverage_is_not_storm_footprint(self):
+        from personal_cic.core.world.components import RadarMosaicState
+        w=WorldState(EventBus()); w.ensure_entity("radar","Radar")
+        w.upsert_component("radar",ObservationState("radar.mosaic",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("radar",RadarMosaicState(
+            "Test","Iowa State","N0Q","base","latest.png","source-t1","retrieved-t2",
+            -82.0,33.0,-79.0,37.0,100.0,1000,800,"imgsha",False,None,True,"legendsha",(),15
+        ))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="radar_product_coverage")
+        self.assertEqual(a.kind,SemanticKind.SPATIAL)
+        self.assertEqual(a.qualifiers["spatial_role"],"product_coverage_envelope")
+        self.assertTrue(a.qualifiers["coverage_is_not_storm_footprint"])
+        self.assertEqual(a.qualifiers["coordinate_order"],"west_south_east_north")
+
+    def test_reference_geometry_extent_has_no_domain_authority_transfer(self):
+        from personal_cic.core.world.components import RadarContextState
+        w=WorldState(EventBus()); w.ensure_entity("context","Context")
+        w.upsert_component("context",ObservationState("radar.context",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("context",RadarContextState(
+            "Test","Census TIGERweb","retrieved-t1",-82.0,33.0,-79.0,37.0,"contextsha","contentsha",4,6,8,10
+        ))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="reference_context_coverage")
+        self.assertEqual(a.kind,SemanticKind.SPATIAL)
+        self.assertTrue(a.qualifiers["reference_geometry_has_no_meteorological_authority"])
+        self.assertTrue(a.qualifiers["reference_geometry_has_no_traffic_event_authority"])
+
+    def test_infrastructure_location_is_not_camera_or_sign_content_semantics(self):
+        from personal_cic.core.world.components import (
+            TrafficCameraCollectionState, TrafficCameraObservation,
+            TrafficMessageSignCollectionState, TrafficMessageSignObservation,
+        )
+        w=WorldState(EventBus())
+        w.ensure_entity("cams","Cams")
+        w.upsert_component("cams",ObservationState("cams",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("cams",TrafficCameraCollectionState(
+            "Test","NCDOT","drivenc",35,-80,10,1,1,
+            (TrafficCameraObservation("c1","drivenc","NCDOT","src","Mecklenburg","I-485","N","MM50",35.2,-80.8,"online","page","video"),)
+        ))
+        w.ensure_entity("signs","Signs")
+        w.upsert_component("signs",ObservationState("signs",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("signs",TrafficMessageSignCollectionState(
+            "Test","NCDOT","drivenc",35,-80,10,1,1,1,
+            (TrafficMessageSignObservation("s1","drivenc","NCDOT","Mecklenburg","I-485","N","Sign",35.3,-80.7,"t1",("CRASH AHEAD",)),)
+        ))
+        spatial=[x for x in project_world_semantics(w) if x.predicate=="reported_infrastructure_location"]
+        self.assertEqual(len(spatial),2)
+        camera=next(x for x in spatial if x.qualifiers["infrastructure_type"]=="traffic_camera")
+        sign=next(x for x in spatial if x.qualifiers["infrastructure_type"]=="dynamic_message_sign")
+        self.assertTrue(camera.qualifiers["location_is_not_visual_observation_result"])
+        self.assertTrue(sign.qualifiers["location_is_not_message_content_location"])
+        self.assertTrue(sign.qualifiers["location_does_not_assert_event_location"])
+
