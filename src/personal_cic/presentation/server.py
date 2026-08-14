@@ -63,6 +63,51 @@ def _handler_factory(
             self._headers(status, "application/json; charset=utf-8", len(body))
             self.wfile.write(body)
 
+        def _host_is_trusted(self) -> bool:
+            """Reject DNS-rebinding Host values at the loopback presentation boundary.
+
+            A browser request to an attacker-controlled hostname can resolve to
+            127.0.0.1 while retaining the attacker hostname in the HTTP Host
+            header. Binding only to loopback therefore does not by itself prove
+            that the request originated from an explicitly local CIC URL.
+            """
+            raw = (self.headers.get("Host") or "").strip()
+            if not raw:
+                return False
+            if raw.startswith("["):
+                closing = raw.find("]")
+                if closing < 0:
+                    return False
+                host = raw[1:closing].casefold()
+            else:
+                host = raw.split(":", 1)[0].casefold()
+            return host in {"127.0.0.1", "localhost"}
+
+        def _reject_untrusted_host(self) -> bool:
+            if self._host_is_trusted():
+                return False
+            self._send_json({"error": "untrusted_host"}, 421)
+            return True
+
+        def _collection_authority_failed(self) -> bool:
+            metadata = runtime_metadata()
+            workers = metadata.get("workers", {})
+            if not isinstance(workers, dict):
+                return False
+            return any(
+                isinstance(status, dict) and status.get("lifecycle") == "failed"
+                for status in workers.values()
+            )
+
+        def _reject_failed_collection_authority(self) -> bool:
+            if not self._collection_authority_failed():
+                return False
+            self._send_json(
+                {"error": "runtime_collection_authority_failed"},
+                503,
+            )
+            return True
+
         def _send_static_asset(self, filename: str, content_type: str):
             if filename not in {"maplibre-gl.js", "maplibre-gl.css"}:
                 self._send_json({"error": "not_found"}, 404)
@@ -137,6 +182,8 @@ def _handler_factory(
             self.wfile.write(payload)
 
         def do_GET(self):
+            if self._reject_untrusted_host():
+                return
             parsed = urlsplit(self.path)
             path = parsed.path
             query = parse_qs(parsed.query)
@@ -168,16 +215,23 @@ def _handler_factory(
                         world,
                         runtime_pid=metadata.get("pid"),
                         runtime_started_at=metadata.get("started_at"),
+                        runtime_workers=metadata.get("workers"),
                     )
                 )
                 return
             if path == "/api/v1/world":
+                if self._reject_failed_collection_authority():
+                    return
                 self._send_json(build_world_projection(world, feed=build_weather_feed(event_journal_path)))
                 return
             if path == "/api/v1/traffic":
+                if self._reject_failed_collection_authority():
+                    return
                 self._send_json(build_traffic_projection(world, site_anchor=site_anchor))
                 return
             if path == "/api/v1/semantics":
+                if self._reject_failed_collection_authority():
+                    return
                 entity_id = (query.get("entity") or [None])[0]
                 kind = (query.get("kind") or [None])[0]
                 predicate = (query.get("predicate") or [None])[0]
@@ -223,6 +277,8 @@ def _handler_factory(
             self._send_json({"error": "not_found"}, 404)
 
         def do_HEAD(self):
+            if self._reject_untrusted_host():
+                return
             parsed = urlsplit(self.path)
             path = parsed.path
             query = parse_qs(parsed.query)
@@ -234,8 +290,13 @@ def _handler_factory(
             elif path == "/static/maplibre/maplibre-gl.css":
                 asset = _MAPLIBRE_VENDOR_DIR / "maplibre-gl.css"
                 self._headers(200 if asset.is_file() else 503, "text/css; charset=utf-8", asset.stat().st_size if asset.is_file() else 0)
-            elif path in ("/api/v1/systems", "/api/v1/world", "/api/v1/traffic", "/api/v1/semantics"):
+            elif path == "/api/v1/systems":
                 self._headers(200, "application/json; charset=utf-8")
+            elif path in ("/api/v1/world", "/api/v1/traffic", "/api/v1/semantics"):
+                if self._collection_authority_failed():
+                    self._headers(503, "application/json; charset=utf-8")
+                else:
+                    self._headers(200, "application/json; charset=utf-8")
             elif path in ("/radar/latest.png", "/radar/warnings.png", "/radar/legend.png"):
                 filename = {
                     "/radar/latest.png": "latest.png",
@@ -270,6 +331,8 @@ def _handler_factory(
                 self._headers(404, "application/json; charset=utf-8")
 
         def _reject_mutation(self):
+            if self._reject_untrusted_host():
+                return
             payload = b'{"error":"read_only"}'
             self.send_response(405)
             self.send_header("Allow", "GET, HEAD")

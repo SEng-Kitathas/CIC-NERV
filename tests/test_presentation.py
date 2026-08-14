@@ -1,4 +1,5 @@
 from hashlib import sha256
+import http.client
 import json
 import unittest
 from urllib.error import HTTPError
@@ -146,6 +147,17 @@ class PresentationTests(unittest.TestCase):
             runtime_metadata=lambda: {
                 "pid": 123,
                 "started_at": "2026-08-11T19:59:00+00:00",
+                "workers": {
+                    "world-awareness": {
+                        "name": "world-awareness",
+                        "lifecycle": "running",
+                        "started_at": "2026-08-11T19:59:01+00:00",
+                        "last_cycle_started_at": None,
+                        "last_cycle_completed_at": None,
+                        "stopped_at": None,
+                        "terminal_failure": None,
+                    }
+                },
             },
         )
         server.start()
@@ -162,6 +174,10 @@ class PresentationTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertEqual(payload["presentation"]["mode"], "read-only")
             self.assertEqual(payload["runtime"]["pid"], 123)
+            self.assertEqual(
+                payload["runtime"]["workers"]["world-awareness"]["lifecycle"],
+                "running",
+            )
 
         request = Request(
             f"http://127.0.0.1:{port}/api/v1/systems",
@@ -172,6 +188,73 @@ class PresentationTests(unittest.TestCase):
             urlopen(request, timeout=2)
 
         self.assertEqual(captured.exception.code, 405)
+
+    def test_loopback_server_rejects_untrusted_host_header(self):
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {},
+        )
+        server.start()
+        self.addCleanup(server.stop)
+
+        connection = http.client.HTTPConnection("127.0.0.1", server.bound_port, timeout=2)
+        self.addCleanup(connection.close)
+        connection.putrequest("GET", "/api/v1/systems", skip_host=True)
+        connection.putheader("Host", "attacker.example")
+        connection.endheaders()
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+
+        self.assertEqual(response.status, 421)
+        self.assertEqual(payload["error"], "untrusted_host")
+
+    def test_failed_collection_authority_blocks_world_traffic_and_semantic_projection(self):
+        failed = {
+            "world-awareness": {
+                "name": "world-awareness",
+                "lifecycle": "failed",
+                "started_at": "2026-08-11T19:59:01+00:00",
+                "last_cycle_started_at": "2026-08-11T20:00:00+00:00",
+                "last_cycle_completed_at": None,
+                "stopped_at": "2026-08-11T20:00:01+00:00",
+                "terminal_failure": "terminal worker exception: RuntimeError",
+            }
+        }
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {"pid": 123, "workers": failed},
+        )
+        server.start()
+        self.addCleanup(server.stop)
+
+        with urlopen(
+            f"http://127.0.0.1:{server.bound_port}/api/v1/systems",
+            timeout=2,
+        ) as response:
+            payload = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertEqual(
+                payload["runtime"]["workers"]["world-awareness"]["lifecycle"],
+                "failed",
+            )
+
+        for path in ("/api/v1/world", "/api/v1/traffic", "/api/v1/semantics"):
+            with self.subTest(path=path):
+                with self.assertRaises(HTTPError) as captured:
+                    urlopen(
+                        f"http://127.0.0.1:{server.bound_port}{path}",
+                        timeout=2,
+                    )
+                self.assertEqual(captured.exception.code, 503)
+                payload = json.loads(captured.exception.read())
+                self.assertEqual(
+                    payload["error"],
+                    "runtime_collection_authority_failed",
+                )
 
     def test_http_root_is_systems_surface(self):
         server = PresentationServer(

@@ -1,3 +1,38 @@
+# 0.3.6 / 003g Runtime Authority RC4 — explainable traffic degradation + local presentation-origin hardening
+
+**Status:** source candidate; RC7 remains target-verified authority.
+
+- Preserves RC3 runtime-authority and OIG/EDG/FIE reconciliation behavior.
+- Adds explicit `summary.degrading_sources` diagnostics to the read-only traffic projection; no source authority or traffic fusion policy is weakened merely to obtain a green status.
+- Makes the Traffic HMI identify the source paths responsible for an aggregate DEGRADED state.
+- Rejects non-local HTTP `Host` values at the loopback presentation boundary to reduce DNS-rebinding exposure.
+- Preserves the target-proved `strict-origin-when-cross-origin` OSM referrer contract; the candidate explicitly rejects the tempting `no-referrer` regression because RC2D-R1 already proved it breaks tiles.
+- Adds the Secure Operating Surface / provider-specific Secure Reference Gateway contract for future camera/reference integration; no generic arbitrary URL proxy is introduced.
+- Records DeFlock as a slow-changing public surveillance-infrastructure reference candidate, not a live traffic/corroboration source.
+
+# 0.3.6 / 003g Runtime Authority RC3 — OIG/EDG + FIE reconciliation
+
+**Status:** source candidate; RC7 remains target-verified authority.
+
+- Preserves Runtime Authority RC2 code/runtime behavior without semantic or snapshot mutation.
+- Reconciles FIE against the completed OIG/EDG first evaluation pass: 0/10 original candidate invariants survived unchanged as universal primitives.
+- Replaces fixed-grammar language with bounded GC-01 / GP-01 / CS-01 / AB-01, GR-01, WT-01 / RC-01 / ED-01 quarry relations and explicit meta-hypothesis status.
+- Records **INTERVENTION-PRESERVING STRUCTURAL RECURRENCE ACROSS SCALE** and **FRACTAL LAUNDERING** as the pressure-qualified recurrence formulation/failure signature.
+- Adds `docs/REASONING_PROVENANCE_HANDOFF.md` as NON-CANONICAL SOP/quarry input; it has no runtime or promotion authority.
+- Mainline direction remains 003g target proof followed by 003h Evidence Association; this reconciliation does not reopen ontology breadth expansion or the OIG/EDG side experiment.
+
+# 0.3.6 / 003g Runtime Authority RC2 — FIE + configuration-control alignment
+
+**Status:** authored-source candidate; not target-promoted. Parent authority remains Semantic Binding RC7
+(`424c8ade02fa4ad4c9f944c82e56a6c715615b18` / `d8ba2a50651d42c14524299b14d6672c76de8cdd`).
+
+- Preserves the Runtime Authority RC1 worker-liveness, fail-fast authority withdrawal, and single durable-writer lease mechanisms.
+- Adds `docs/FRACTAL_ISOMORPHISM_ENGINEERING.md`, defining FIE as a PDVER-governed heuristic for mining conserved structure across domains/scales while requiring breakpoint audits.
+- Adds `docs/AUTHORITY_LINEAGE.md` so current target authority, active candidate, historical evidence, and derived runtime state have separate configuration-control homes.
+- Updates current-facing README/architecture/traffic/conformance/semantic/runtime-authority documents from stale pre-RC7 status without rewriting historical QA audit claims.
+- Removes the stale hard-coded `003f RC2D-R2` Traffic HMI chip; the UI no longer claims a release lineage that it cannot dynamically verify.
+- No new semantic home, traffic association claim, snapshot/journal schema, ontology runtime dependency, or world-state writer is introduced.
+
 # 0.3.6 / 003f RC2D-R2-QA1-R2 — Service-installer verifier-scope propagation
 
 - Corrects `tools/install-user-service.sh` to verify the embodied checkout with

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted
 from personal_cic.traffic_awareness import TrafficAwarenessWorker
 from personal_cic.world_awareness import WorldAwarenessWorker
+from personal_cic.runtime_authority import WorkerLiveness
 
 
 class _FakeThread:
@@ -57,6 +58,7 @@ class ConcurrencyIntegrityTests(unittest.TestCase):
         worker._stop = threading.Event()
         thread = _FakeThread(alive=True)
         worker._thread = thread
+        worker._liveness = WorkerLiveness("world-awareness")
         provider = SimpleNamespace(timeout_seconds=1.0)
         worker.config = SimpleNamespace(
             weather=provider, alerts=provider, surface=provider, forecast=provider,
@@ -71,6 +73,7 @@ class ConcurrencyIntegrityTests(unittest.TestCase):
         worker._stop = threading.Event()
         thread = _FakeThread(alive=True)
         worker._thread = thread
+        worker._liveness = WorkerLiveness("traffic-awareness")
         provider = SimpleNamespace(timeout_seconds=1.0)
         worker.config = SimpleNamespace(
             drivenc=provider, wzdx=provider, cmpd=provider,

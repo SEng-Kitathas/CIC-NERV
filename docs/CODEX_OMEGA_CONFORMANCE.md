@@ -71,23 +71,32 @@ Radar metadata authority lives in `RadarMosaicState`; raw image bytes remain ada
 - Last-success time is preserved during retention.
 - Re-entry requires fresh success before retention is eligible.
 - Source-specific freshness policy, not an arbitrary failure counter, decides when retained authority expires.
-## 0.3.6 / 003f current candidate conformance — RC2D-R2-QA1
+## 0.3.6 / 003g current candidate conformance — Runtime Authority RC4
 
-This section is an internal assurance assessment, not an external certification claim. The running
-target and claim-matched gates retain veto authority.
+This section is an internal assurance assessment, not an external certification claim. RC7 remains the
+target-verified authority until exact target gates promote a successor. Historical QA1 evidence remains
+in `QUALITY_AUDIT_2026-08-13.md` and is not rewritten into present-tense authority.
 
-- **G0 Build/existence:** authored source compiles/imports under the audit interpreter; full unit regression passes. A fresh map-capable deployment additionally requires materialized pinned MapLibre runtime bytes.
-- **G1 Type/boundary:** configuration now parses strict booleans, finite numbers, structured arrays/maps, environment names, and source-provenanced site anchors at ingress. Broad dynamic carrier types remain explicit debt at ECS/event seams.
-- **G2 State/protocol:** collection center, fixed site anchor, and live operator position are distinct; unavailable/current/degraded states and same-lineage traffic association remain explicit.
-- **G3 Resource/effect:** vendor/remote acquisition remains in adapters. Presentation is read-only. Service install refuses an incomplete required presentation runtime.
-- **G4 Temporal/concurrency:** worker stop returns actual quiescence; timeout is not success. Concurrent journal append is serialized. Runtime does not force a final snapshot while a state-mutating worker remains live.
-- **G5 Serialization/persistence:** snapshot writer remains v2; known historical v1/v2/v3 are explicitly readable; unknown future versions fail closed. Explicit migrations remain debt.
-- **G6 Security/authority:** loopback-only bind and GET/HEAD presentation authority remain; secrets stay environment-based; service adds no-new-privileges and restrictive umask. Inline script/style CSP remains accepted presentation debt at the current sovereignty level.
-- **G7 Architecture/holonic:** no new generic provider manager or semantic god-object was introduced. Existing large functions are recorded as refactor pressure, not mechanically split without an invariant.
-- **G8 Verification:** regression, concurrency, configuration, persistence, source-distribution, coverage, syntax, JSON, shell, and artifact-integrity evidence are retained by the QA audit. Human HMI acceptance remains separate.
-- **G9 Continuity/governance:** promoted RC1B floor, open 003f slice, candidate chronology, donor/non-lineage distinction, and unearned RC2D-R2/QA1 status are explicit.
-- **G10 Supply chain:** MapLibre source/version/archive digest and target Python direct dependency are configuration-controlled separately from authored source. Build-toolchain locking is not yet target-qualified.
-- **G11 Performance:** no new quantitative performance claim is promoted by QA1. Operator reports of smoothness are useful target evidence but are not a benchmark.
+- **G0 Build/existence:** the 003g source candidate imports and passes its source-local quality/regression gates; target promotion remains unearned.
+- **G1 Type/boundary:** worker lifecycle is closed typed state; collection authority and process liveness are distinct propositions.
+- **G2 State/protocol:** terminal worker failure cannot be normalized into graceful stop; durable writer ownership is an explicit lease state rather than an ambient assumption.
+- **G3 Resource/effect:** provider/OS effects remain in adapters; presentation remains read-only; a failed enabled collection plane withdraws dependent read authority rather than serving an apparently healthy world surface.
+- **G4 Temporal/concurrency:** worker start/stop/cycle/failure timing is explicit; failure wakes the runtime; single-writer `flock` prevents concurrent durable embodiment.
+- **G5 Serialization/persistence:** no snapshot-schema mutation is introduced; RC7 semantic persistence remains absent. Runtime failure deliberately skips a forced final snapshot when authority cannot be established.
+- **G6 Security/authority:** arbitrary terminal exception text is not projected/persisted; only bounded failure classification crosses the runtime metadata seam.
+- **G7 Architecture/holonic:** runtime supervision, durable embodiment, WorldState, semantics, and presentation retain separate ownership. FIE is a bounded recurrence/search heuristic reconciled against OIG/EDG falsification; no universal grammar or new runtime god-object is introduced.
+- **G8 Verification:** source-local tests/quality gates qualify only the candidate. Target worker-kill and competing-writer tests are required before promotion.
+- **G9 Continuity/governance:** current authority is RC7 (`424c8ade...` / `d8ba2a50...`); 003g is explicitly candidate lineage; historical QA1/RC2D records remain historical.
+- **G10 Supply chain:** MapLibre authored lock versus derived runtime materialization remains unchanged.
+- **G11 Performance:** 003g makes no new performance claim. Semantic endpoint and persistence scaling remain measurement-triggered future work.
+
+### Fractal-Isomorphism Engineering / OIG-EDG conformance
+
+FIE is classified as **HEURISTIC / mechanism-search discipline**. The OIG/EDG EVAL First Pass is
+**CLOSED AS EVALUATION — NON-CANONICAL** and explicitly found that 0/10 original candidate invariants
+survived unchanged as universal primitives. Cross-domain/cross-scale reuse therefore requires explicit
+query/frame, guarantee, intervention, acquisition limits, non-isomorphism breakpoints, target-native
+embodiment, and claim-matched verification. The CIC-facing handoff is quarry/SOP input only.
 
 ### Additional residual seams accepted by QA1
 

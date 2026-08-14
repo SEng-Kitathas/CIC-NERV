@@ -1,4 +1,17 @@
-# 003f Semantic Binding RC3
+# 003f Semantic Binding RC7 — Target-Verified Foundation
+
+**Current status:** RC7 is sealed at `slice-003f-semantic-binding-rc7-target-verified`
+(commit `424c8ade02fa4ad4c9f944c82e56a6c715615b18`, tree
+`d8ba2a50651d42c14524299b14d6672c76de8cdd`). RC1–RC6 sections below are retained as
+construction history. RC7 deliberately stops ontology-breadth expansion; future semantic homes are
+pressure-triggered only.
+
+The semantic layer is interpreted through the same compositional discipline used elsewhere in CIC:
+identity, provenance, temporal context, spatial role, authority, modality, and foreign-native semantics
+remain orthogonal homes rather than being collapsed into inheritance or one universal confidence/state
+field. `FRACTAL_ISOMORPHISM_ENGINEERING.md` records the cross-scale heuristic; it does not create new
+semantic authority.
+
 
 RC3 extends the target-verified RC2 semantic spine without changing its identity,
 provenance, temporal, or read-only authority contracts.

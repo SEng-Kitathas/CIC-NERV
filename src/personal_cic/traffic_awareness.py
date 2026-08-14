@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import threading
 import time
+from typing import Callable
 
 from personal_cic.adapters.world import (
     CharlotteStreetClosuresAdapter,
@@ -27,6 +28,12 @@ from personal_cic.core.world.components import (
     TrafficFlowCollectionState,
     TrafficMessageSignCollectionState,
     TrafficSituationState,
+)
+
+from personal_cic.runtime_authority import (
+    WorkerLifecycle,
+    WorkerLiveness,
+    WorkerRuntimeStatus,
 )
 
 
@@ -209,6 +216,7 @@ class TrafficAwarenessWorker:
         location_label: str,
         latitude: float,
         longitude: float,
+        on_terminal_failure: Callable[[WorkerRuntimeStatus], None] | None = None,
     ) -> None:
         self.context = context
         self.config = config
@@ -268,6 +276,8 @@ class TrafficAwarenessWorker:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._on_terminal_failure = on_terminal_failure
+        self._liveness = WorkerLiveness("traffic-awareness")
 
     def _ensure_entities(self) -> None:
         labels = {
@@ -312,12 +322,59 @@ class TrafficAwarenessWorker:
             self._withdraw(TOMTOM_FLOW_ENTITY_ID, self.tomtom_flow_adapter.ADAPTER_ID, "awaiting fresh TomTom flow observation")
         self._withdraw(SITUATION_ENTITY_ID, "traffic.fusion", "awaiting fresh traffic collection source")
 
+    def runtime_status(self) -> WorkerRuntimeStatus:
+        """Return a read-only liveness snapshot for presentation/inspection."""
+        return self._liveness.snapshot()
+
+    def supervision_status(self) -> WorkerRuntimeStatus:
+        """Return liveness while converting silent thread death into failure."""
+        thread = self._thread
+        status = self._liveness.snapshot()
+        if (
+            thread is not None
+            and not thread.is_alive()
+            and status.lifecycle
+            not in (WorkerLifecycle.FAILED, WorkerLifecycle.STOPPED, WorkerLifecycle.STOPPING)
+        ):
+            status = self._liveness.mark_failed(
+                "worker thread exited without a terminal liveness transition"
+            )
+        return status
+
+    def _notify_failure(self, status: WorkerRuntimeStatus) -> None:
+        callback = self._on_terminal_failure
+        if callback is not None:
+            callback(status)
+
+    def _run_guarded(self) -> None:
+        self._liveness.mark_running()
+        try:
+            self._run()
+        except Exception as exc:
+            # Do not persist or project arbitrary provider exception text: request
+            # failures can contain credentials or source-native sensitive details.
+            status = self._liveness.mark_failed(
+                f"terminal worker exception: {type(exc).__name__}"
+            )
+            self._notify_failure(status)
+            return
+
+        if self._stop.is_set():
+            self._liveness.mark_stopped()
+            return
+
+        status = self._liveness.mark_failed(
+            "worker loop returned without a stop request"
+        )
+        self._notify_failure(status)
+
     def start(self) -> None:
         if not self.config.enabled or self._thread is not None:
             return
         self._ensure_entities()
+        self._liveness.mark_starting()
         self._thread = threading.Thread(
-            target=self._run,
+            target=self._run_guarded,
             name="personal-cic-traffic-awareness",
             daemon=True,
         )
@@ -330,6 +387,7 @@ class TrafficAwarenessWorker:
         collection pass. The join budget therefore cannot be treated as proof of
         thread termination. A still-live worker remains explicitly represented.
         """
+        self._liveness.mark_stopping()
         self._stop.set()
         thread = self._thread
         if thread is None:
@@ -345,6 +403,7 @@ class TrafficAwarenessWorker:
         stopped = not thread.is_alive()
         if stopped:
             self._thread = None
+            self._liveness.mark_stopped()
         return stopped
 
     def _source(self, entity_id: str, component_type: type):
@@ -489,6 +548,7 @@ class TrafficAwarenessWorker:
         )
 
         while not self._stop.is_set():
+            self._liveness.mark_cycle_started()
             now = time.monotonic()
             for name in order:
                 if not enabled[name] or now < next_due[name]:
@@ -500,6 +560,7 @@ class TrafficAwarenessWorker:
                     break
                 now = time.monotonic()
 
+            self._liveness.mark_cycle_completed()
             due = [next_due[name] for name in order if enabled[name]]
             wait_for = 1.0 if not due else max(0.1, min(due) - time.monotonic())
             self._stop.wait(min(wait_for, 1.0))

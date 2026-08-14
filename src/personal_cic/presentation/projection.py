@@ -63,6 +63,7 @@ def build_systems_projection(
     *,
     runtime_pid: int | None = None,
     runtime_started_at: str | None = None,
+    runtime_workers: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a read-only operator projection from one atomic WorldState snapshot.
 
@@ -121,6 +122,7 @@ def build_systems_projection(
         "runtime": {
             "pid": runtime_pid,
             "started_at": runtime_started_at,
+            "workers": dict(runtime_workers or {}),
         },
         "summary": {
             "health": _worst(health_values, _HEALTH_ORDER, "unknown"),
@@ -522,6 +524,40 @@ def build_traffic_projection(
         "observation": signs_obs,
     }
 
+    source_diagnostics = (
+        ("drivenc_events", "DriveNC events", event_sources["drivenc_events"]["observation"]),
+        ("wzdx", "DriveNC WZDx", event_sources["wzdx"]["observation"]),
+        ("cmpd", "CMPD traffic CAD", event_sources["cmpd"]["observation"]),
+        ("charlotte_closures", "Charlotte street closures", event_sources["charlotte_closures"]["observation"]),
+        ("tomtom_incidents", "TomTom incidents", event_sources["tomtom_incidents"]["observation"]),
+        ("tomtom_flow", "TomTom flow", flow_obs),
+        ("cameras", "DriveNC cameras", cameras_obs),
+        ("message_signs", "DriveNC message signs", signs_obs),
+    )
+    degrading_sources = []
+    for key, label, observation in source_diagnostics:
+        # Disabled/unconfigured source entities have no adapter observation and
+        # must not fabricate degradation merely because the generic projection
+        # default is "unavailable". Re-entry withdrawals and real collection
+        # attempts both carry adapter identity, so configured paths remain visible.
+        if not observation.get("adapter_id"):
+            continue
+        availability = str(observation.get("availability") or "unavailable")
+        if availability == "current":
+            continue
+        degrading_sources.append(
+            {
+                "source_key": key,
+                "label": label,
+                "availability": availability,
+                "adapter_id": observation.get("adapter_id"),
+                "checked_at": observation.get("checked_at"),
+                "last_success_at": observation.get("last_success_at"),
+                "last_success_age_seconds": observation.get("last_success_age_seconds"),
+                "reasons": observation.get("reasons", []),
+            }
+        )
+
     situation_entity = "local-traffic-situation"
     situation = entity_component(situation_entity, "TrafficSituationState")
     situation_obs = obs(situation_entity)
@@ -598,6 +634,8 @@ def build_traffic_projection(
             "source_families": situation.get("current_source_families", []),
             "correlation_mode": situation.get("correlation_mode"),
             "collection_gaps": situation.get("collection_gaps", []),
+            "degrading_source_count": len(degrading_sources),
+            "degrading_sources": degrading_sources,
             "observation": situation_obs,
         },
         "event_sources": event_sources,

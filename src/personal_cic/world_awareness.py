@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import threading
 import time
+from typing import Callable
 
 from personal_cic.adapters.world import (
     AviationSurfaceAdapter,
@@ -26,6 +27,11 @@ from personal_cic.core.world.components import (
     WeatherState,
 )
 from personal_cic.weather_fusion import derive_current_weather_estimate
+from personal_cic.runtime_authority import (
+    WorkerLifecycle,
+    WorkerLiveness,
+    WorkerRuntimeStatus,
+)
 
 
 WEATHER_ENTITY_ID = "local-weather"
@@ -40,7 +46,13 @@ RADAR_CONTEXT_ENTITY_ID = "local-weather-radar-context"
 class WorldAwarenessWorker:
     """Slow remote-provider observation loop isolated from local 5-second sensing."""
 
-    def __init__(self, *, context: RuntimeContext, config: WorldAwarenessConfig) -> None:
+    def __init__(
+        self,
+        *,
+        context: RuntimeContext,
+        config: WorldAwarenessConfig,
+        on_terminal_failure: Callable[[WorkerRuntimeStatus], None] | None = None,
+    ) -> None:
         self.context = context
         self.config = config
         loc = config.location
@@ -101,6 +113,8 @@ class WorldAwarenessWorker:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._on_terminal_failure = on_terminal_failure
+        self._liveness = WorkerLiveness("world-awareness")
         # Runtime-epoch proof: persisted state cannot use retention to bypass re-entry.
         self._surface_fresh_since_reentry = False
 
@@ -145,11 +159,62 @@ class WorldAwarenessWorker:
             )
         self._withdraw(ESTIMATE_ENTITY_ID, "weather.fusion", "awaiting fresh current-weather source")
 
+    def runtime_status(self) -> WorkerRuntimeStatus:
+        """Return a read-only liveness snapshot for presentation/inspection."""
+        return self._liveness.snapshot()
+
+    def supervision_status(self) -> WorkerRuntimeStatus:
+        """Return liveness while converting silent thread death into failure."""
+        thread = self._thread
+        status = self._liveness.snapshot()
+        if (
+            thread is not None
+            and not thread.is_alive()
+            and status.lifecycle
+            not in (WorkerLifecycle.FAILED, WorkerLifecycle.STOPPED, WorkerLifecycle.STOPPING)
+        ):
+            status = self._liveness.mark_failed(
+                "worker thread exited without a terminal liveness transition"
+            )
+        return status
+
+    def _notify_failure(self, status: WorkerRuntimeStatus) -> None:
+        callback = self._on_terminal_failure
+        if callback is not None:
+            callback(status)
+
+    def _run_guarded(self) -> None:
+        self._liveness.mark_running()
+        try:
+            self._run()
+        except Exception as exc:
+            # Do not persist or project arbitrary provider exception text: request
+            # failures can contain credentials or source-native sensitive details.
+            status = self._liveness.mark_failed(
+                f"terminal worker exception: {type(exc).__name__}"
+            )
+            self._notify_failure(status)
+            return
+
+        if self._stop.is_set():
+            self._liveness.mark_stopped()
+            return
+
+        status = self._liveness.mark_failed(
+            "worker loop returned without a stop request"
+        )
+        self._notify_failure(status)
+
     def start(self) -> None:
         if not self.config.enabled or self._thread is not None:
             return
         self._ensure_entities()
-        self._thread = threading.Thread(target=self._run, name="personal-cic-world-awareness", daemon=True)
+        self._liveness.mark_starting()
+        self._thread = threading.Thread(
+            target=self._run_guarded,
+            name="personal-cic-world-awareness",
+            daemon=True,
+        )
         self._thread.start()
 
     def stop(self) -> bool:
@@ -159,6 +224,7 @@ class WorldAwarenessWorker:
         call outlives the join budget so runtime shutdown can avoid claiming a
         race-free final snapshot.
         """
+        self._liveness.mark_stopping()
         self._stop.set()
         thread = self._thread
         if thread is None:
@@ -175,6 +241,7 @@ class WorldAwarenessWorker:
         stopped = not thread.is_alive()
         if stopped:
             self._thread = None
+            self._liveness.mark_stopped()
         return stopped
 
     def _recompute_estimate(self) -> None:
@@ -334,6 +401,7 @@ class WorldAwarenessWorker:
         }
 
         while not self._stop.is_set():
+            self._liveness.mark_cycle_started()
             now = time.monotonic()
             for name in ("alerts", "surface", "weather", "forecast", "radar", "radar_context"):
                 if not enabled[name] or now < next_due[name]:
@@ -344,6 +412,7 @@ class WorldAwarenessWorker:
                     break
                 now = time.monotonic()
 
+            self._liveness.mark_cycle_completed()
             due = [next_due[name] for name in next_due if enabled[name]]
             wait_for = 1.0 if not due else max(0.1, min(due) - time.monotonic())
             self._stop.wait(min(wait_for, 1.0))

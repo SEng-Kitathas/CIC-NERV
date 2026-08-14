@@ -5,6 +5,22 @@ from pathlib import Path
 
 from personal_cic.core.events import EventBus, EventJournal, RuntimeStarted
 from personal_cic.runtime import PersistentRuntime
+from personal_cic.runtime_authority import (
+    WorkerLifecycle,
+    WorkerRuntimeStatus,
+)
+
+
+def _running_status(name: str) -> WorkerRuntimeStatus:
+    return WorkerRuntimeStatus(
+        name=name,
+        lifecycle=WorkerLifecycle.RUNNING,
+        started_at="2026-08-13T00:00:00+00:00",
+        last_cycle_started_at=None,
+        last_cycle_completed_at=None,
+        stopped_at=None,
+        terminal_failure=None,
+    )
 
 
 class RuntimeOrderingTests(unittest.TestCase):
@@ -58,6 +74,12 @@ class RuntimeOrderingTests(unittest.TestCase):
                     calls.append("world-start")
                     runtime.request_stop("test")
 
+                def runtime_status(self_inner):
+                    return _running_status("world-awareness")
+
+                def supervision_status(self_inner):
+                    return _running_status("world-awareness")
+
                 def stop(self_inner):
                     calls.append("world-stop")
                     return True
@@ -71,8 +93,8 @@ class RuntimeOrderingTests(unittest.TestCase):
                 calls.index("presentation-start"),
             )
             self.assertLess(
-                calls.index("presentation-start"),
                 calls.index("world-start"),
+                calls.index("presentation-start"),
             )
     def test_incomplete_remote_worker_shutdown_skips_forced_final_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -102,6 +124,12 @@ class RuntimeOrderingTests(unittest.TestCase):
 
                 def start(self_inner):
                     runtime.request_stop("test")
+
+                def runtime_status(self_inner):
+                    return _running_status("world-awareness")
+
+                def supervision_status(self_inner):
+                    return _running_status("world-awareness")
 
                 def stop(self_inner):
                     return False

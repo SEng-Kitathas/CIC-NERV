@@ -16,6 +16,19 @@ than directly manipulating devices.
 A holon is simultaneously a coherent whole and a valid part of a larger whole. A holon earns
 a boundary when it has a clear purpose, ownership boundary, interface, invariants, and hazards.
 
+## Fractal-isomorphic design heuristic
+
+Personal CIC deliberately searches for useful structural recurrence across domains and scales, but the
+closed OIG/EDG first evaluation pass materially bounded that intuition: no fixed universal primitive list
+survived. The retained method is Fractal-Isomorphism Engineering (FIE): declare the frame, guarantee,
+intervention, and acquisition limits; test the candidate relation against breakpoints and null explanations;
+embody only the bounded survivor in the target-native substrate; verify it; then recurse through PDVER.
+
+Native fractal shorthand is **intervention-preserving structural recurrence across scale**. Vocabulary reuse
+alone is explicitly rejected as **Fractal Laundering**. FIE does **not** collapse ECS, holonics, FDIR, circuit
+breakers, ontology, runtime supervision, or release promotion into one abstraction. See
+`FRACTAL_ISOMORPHISM_ENGINEERING.md` and `REASONING_PROVENANCE_HANDOFF.md`.
+
 ## Slice 001 — Self Awareness
 
 The Systems holon observes the Engage and Tenda, normalizes telemetry into components,
@@ -161,9 +174,14 @@ Traffic reuses the established Observation Integrity and re-entry laws. A succes
 
 The `/traffic` browser remains a read-only WorldState projection. TIGERweb radar-context geometry may be reused as separately sourced reference context, but it acquires no traffic authority. Waze Live Map is an explicit exception only as operator-triggered external visual evidence: browser direct, noncanonical, and never counted as normalized corroboration in RC1.
 
-## 0.3.6 / Slice 003f — current architectural state
+## 0.3.6 / RC7 semantic-foundation checkpoint and 003g continuation
 
-Slice 003f remains open. The promoted floor is RC1B; later RC2/RC2A/RC2B-R1/RC2C/RC2D/RC2D-R1/RC2D-R2 work remains candidate lineage until an exact target promotion gate earns a new floor.
+Slice 003f is sealed at `slice-003f-semantic-binding-rc7-target-verified`
+(`424c8ade02fa4ad4c9f944c82e56a6c715615b18`, tree
+`d8ba2a50651d42c14524299b14d6672c76de8cdd`). The ontology/semantic-binding breadth workstream is
+closed for now; future semantic expansion requires operational pressure. Mainline development continues
+in 003g Runtime Authority Integrity. The 003g authored tree is a candidate until target proof earns a
+new checkpoint.
 
 The current architecture is intentionally hybrid rather than a single universal store:
 
@@ -254,3 +272,10 @@ service install must verify that the pinned MapLibre runtime is materialized bef
 Compatibility ranges in `pyproject.toml` and exact observed target dependency pins are separate
 claims; see `requirements-target.lock` and `docs/SOURCE_DISTRIBUTION.md`.
 
+
+
+### 003g RC4 — presentation-origin and degradation-diagnostic pressure
+
+RC4 keeps runtime/world authority semantics unchanged while hardening the operator-facing transport boundary. Loopback HTTP now rejects untrusted `Host` values rather than assuming loopback binding alone defeats browser-origin attacks. Traffic presentation also projects the exact configured source paths currently degrading the aggregate traffic picture, so a yellow summary state is diagnosable rather than a generic health color.
+
+A future Secure Reference Gateway is defined in `docs/SECURE_OPERATING_SURFACE.md`; it is not yet an arbitrary proxy or a credential-bypass mechanism.

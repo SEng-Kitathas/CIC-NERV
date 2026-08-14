@@ -1,16 +1,15 @@
-# Traffic Situational Awareness — Slice 003f OPEN
+# Traffic Situational Awareness — 003f Foundation / 003g Continuation
 
 
 ## Current status — 2026-08-13
 
-- Promoted floor: `slice-003f-rc1b-target-verified` / `99eb5e1d8fad82a0603825282218e3d98aa7d039`.
-- RC2 collection/backend has target evidence but remains unpromoted in the open slice.
-- RC2D-R1 geographic-camera/browser contract has operator evidence.
-- RC2D-R2 fixed-site-anchor is a candidate and has not yet earned target promotion.
-- QA1 is an offline source-quality reconciliation layered over RC2D-R2; it does not create new traffic-fusion authority.
+- Current target-verified authority: `slice-003f-semantic-binding-rc7-target-verified` / `424c8ade02fa4ad4c9f944c82e56a6c715615b18`.
+- RC7 preserves the multi-lineage traffic substrate and its read-only presentation while adding the now-sealed semantic inspection foundation.
+- 003g Runtime Authority Integrity is the active source-candidate slice; it does not add cross-lineage traffic equivalence or corroboration claims.
+- Historical RC2/RC2D/QA1 labels below describe the construction lineage that was later promoted through QA1 and Semantic Binding RC1–RC7.
 
-Target behavior remains the final authority. Historical RC labels below describe the sequence that
-created the current candidate; they are not all promoted checkpoints.
+Target behavior remains final authority. Historical status statements are preserved as evidence of their
+own phase and must not be read as present-tense configuration control.
 
 ## Purpose
 
@@ -402,3 +401,16 @@ RC2D-R2 exposes the fixed site separately as `operator_context.site_anchor`, bac
 Union County address-point evidence. `live_operator_position` remains null. The map therefore has no
 license to imply that the fixed site is a live/mobile person location.
 
+
+
+## 003g RC4 — explainable degradation and secure-reference quarry
+
+The aggregate traffic situation remains intentionally `DEGRADED` whenever an enabled/configured source path is unavailable or partial and no stronger policy says that path is optional. RC4 does **not** paint that state green. Instead `/api/v1/traffic` now exposes `summary.degrading_sources` with each observed adapter path, availability, last-success timing, and bounded reason strings. The HMI surfaces those paths directly above the broader collection-gap list. Target evidence must determine which source is keeping the current system degraded before policy is changed.
+
+### DeFlock / public surveillance-infrastructure reference candidate
+
+DeFlock is being tracked as a **reference-source candidate**, not as live traffic truth. The project maps publicly reported ALPR/surveillance infrastructure using OpenStreetMap-compatible data. If embodied, CIC should ingest the underlying public map records with explicit OSM/DeFlock-profile provenance, slow-changing freshness semantics, and no plate/vehicle capture data. Camera-location presence would be infrastructure context, not evidence of a traffic event, police action, or observed vehicle.
+
+### Direct camera feeds
+
+DriveNC camera records can expose provider page/video references, but those references do not automatically grant CIC playback authority. Direct in-CIC viewing should use the provider-specific Secure Reference Gateway contract in `docs/SECURE_OPERATING_SURFACE.md` once the target recon establishes which camera hosts are public, which return credential challenges, and whether a supported stream contract exists.

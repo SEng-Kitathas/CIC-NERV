@@ -2,29 +2,34 @@
 
 A local-first, holonic, ECS-inspired operator CIC over a provenance-bearing world-state runtime.
 
-## Current configuration-controlled status — 2026-08-13
+## Current configuration-controlled status — 2026-08-14
 
 - **Version:** `0.3.6`
-- **Slice:** `003f` — **OPEN**
-- **Promoted floor:** `99eb5e1d8fad82a0603825282218e3d98aa7d039` (`slice-003f-rc1b-target-verified`)
-- **Current authored-source candidate:** `RC2D-R2 + QA1-R2`
-- **Promotion state:** candidate only; RC2D-R2 and QA1-R2 have **not** been target-promoted.
+- **Target-verified authority:** `424c8ade02fa4ad4c9f944c82e56a6c715615b18` / `d8ba2a50651d42c14524299b14d6672c76de8cdd` (`slice-003f-semantic-binding-rc7-target-verified`)
+- **Semantic foundation:** RC7 target-verified and intentionally closed for breadth expansion; future semantic work is pressure-triggered.
+- **Active slice:** `003g` — Runtime Authority Integrity
+- **Current authored-source candidate:** `003g Runtime Authority RC4`
+- **Promotion state:** source candidate only; RC7 remains sovereign until exact target qualification/promotion earns a successor.
 - **Authority rule:** target behavior and exact-byte gates outrank this document.
 
-The current candidate preserves the verified host/weather/radar/traffic lineage while adding the
-MapLibre geographic camera, the RC2D-R1 browser-resource contract repair, and an explicitly
-separate fixed CIC site anchor. The traffic collection-scope center, fixed site anchor, and future
-live operator position are distinct concepts.
+The 003g candidate hardens the proposition that collection authority cannot outlive the mechanism
+earning it and that durable WorldState embodiment has exactly one writer owner. RC3 preserves the
+Runtime Authority mechanism, reconciles FIE against the closed OIG/EDG first-pass falsification results,
+and records the non-canonical reasoning/provenance handoff without changing runtime authority semantics.
 
-The QA1 reconciliation hardens configuration parsing, snapshot-version governance, concurrent
-shutdown honesty, event-journal concurrency, dependency/source-distribution provenance, and
-current documentation. It intentionally does **not** add new traffic-fusion claims.
+See `docs/AUTHORITY_LINEAGE.md`, `docs/RUNTIME_AUTHORITY.md`,
+`docs/FRACTAL_ISOMORPHISM_ENGINEERING.md`, and `docs/REASONING_PROVENANCE_HANDOFF.md`.
 
 ## Architecture in one line
 
 ```text
-entity → components → WorldState → typed events → systems/derivation → read-only CIC projection
+entity → orthogonal components → WorldState → typed events → narrow systems/derivation → read-only CIC projection
 ```
+
+Across scales, Personal CIC may use recurrent structure as a search signal, but the OIG/EDG first pass
+explicitly rejected a fixed universal grammar: 0/10 original candidates survived unchanged as universal
+primitives. FIE now requires explicit frame, intervention, guarantee, breakpoint, and target-verification
+work before any cross-domain or cross-scale relation earns local reuse.
 
 Remote and local sources terminate at typed acquisition boundaries. Presentation consumes
 normalized state; it does not own world truth. See `docs/ARCHITECTURE.md`,
