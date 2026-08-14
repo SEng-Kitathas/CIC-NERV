@@ -14,3 +14,7 @@ htmlcov/
 *.whl
 
 state/*.lock
+
+# Deployment-local Personal CIC configuration is private mutable state.
+# Authored source carries only config/runtime.example.json.
+config/runtime.json

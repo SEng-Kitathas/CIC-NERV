@@ -228,11 +228,19 @@ class PersistentRuntime:
             self._durable_lease.release()
 
 
+
+
+def default_runtime_config_path() -> Path:
+    # Configuration intent is deployment-local mutable state.
+    config_home = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config')))
+    return config_home / 'personal-cic' / 'runtime.json'
+
+
 def main() -> None:
     parser = ArgumentParser(description="Personal CIC persistent runtime")
     parser.add_argument(
         "--config",
-        default="config/runtime.json",
+        default=str(default_runtime_config_path()),
         help="runtime configuration file",
     )
     parser.add_argument(

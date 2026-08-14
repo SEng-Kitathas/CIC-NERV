@@ -75,3 +75,11 @@ source-capture check remains mandatory on extracted/sealed source before target 
 This caller-level distinction is configuration-controlled and regression-tested. Fixing a
 verifier mode is insufficient if a composed tool silently invokes the wrong mode.
 
+
+## Deployment configuration is not authored source
+
+`config/runtime.example.json` is the reusable neutral example. The live
+deployment file is `${XDG_CONFIG_HOME:-~/.config}/personal-cic/runtime.json`
+and is intentionally outside authored Git identity. A source installation may
+initialize a missing deployment config from the example, but must not overwrite
+an existing deployment configuration. Provider secrets remain outside both.

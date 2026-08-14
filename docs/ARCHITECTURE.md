@@ -279,3 +279,16 @@ claims; see `requirements-target.lock` and `docs/SOURCE_DISTRIBUTION.md`.
 RC4 keeps runtime/world authority semantics unchanged while hardening the operator-facing transport boundary. Loopback HTTP now rejects untrusted `Host` values rather than assuming loopback binding alone defeats browser-origin attacks. Traffic presentation also projects the exact configured source paths currently degrading the aggregate traffic picture, so a yellow summary state is diagnosable rather than a generic health color.
 
 A future Secure Reference Gateway is defined in `docs/SECURE_OPERATING_SURFACE.md`; it is not yet an arbitrary proxy or a credential-bypass mechanism.
+
+### 003h-A0 — configuration authority boundary
+
+Configuration is declarative intent; runtime qualification is observed
+capability. Reusable authored source, deployment-local configuration, secret
+state, WorldState, and runtime authority are separate artifact/authority
+classes.
+
+The live deployment configuration belongs under the user's XDG configuration
+root (`~/.config/personal-cic/runtime.json` when `XDG_CONFIG_HOME` is unset).
+Authored source carries a neutral `config/runtime.example.json`, not a live site
+specimen. Existing deployment configuration is never overwritten by source
+installation. See `docs/CONFIGURATION_AUTHORITY.md`.
