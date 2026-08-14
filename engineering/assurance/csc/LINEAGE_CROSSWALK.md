@@ -39,3 +39,23 @@ pressure first.
 
 This is deliberate CSC lineage compliance: import the earned invariant, not the
 historical syntax or target-specific ceremony.
+
+## Discrimination hardening translation
+
+The recovered CSC v2 doctrine required the checker to prove that its own rules
+can distinguish known-good, known-bad, adversarial near-miss, and false-positive
+specimens. CIC now embodies that invariant directly through an explicit rule
+registry and generated discrimination report.
+
+This is intentionally not a restoration of every historical slop rule. The
+first registered rules cover only already-earned structural/authority seams:
+
+- audit-only authority mode;
+- command exit-contract semantics;
+- exact lineage-anchor presence;
+- declared doctrine-surface presence;
+- exact project source-root contract.
+
+All remain `enforcement_eligible=false`. Historical complexity, LOC, argument,
+style, keyword, launcher, and route heuristics remain lineage evidence until
+they independently earn useful discrimination against CIC-specific fixtures.

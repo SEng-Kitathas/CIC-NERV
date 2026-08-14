@@ -1,0 +1,72 @@
+{
+  "format": "personal-cic.csc-rule-registry.v1",
+  "authority_mode": "audit_only",
+  "veto_authority": "NONE",
+  "rules": [
+    {
+      "rule_id": "authority_mode_guard",
+      "family": "claim_governance",
+      "description": "Reject unqualified assurance authority modes while accepting audit-only configuration.",
+      "authority_status": "audit_only",
+      "enforcement_eligible": false,
+      "required_case_classes": [
+        "known_good",
+        "known_bad",
+        "near_miss",
+        "false_positive"
+      ]
+    },
+    {
+      "rule_id": "command_gate_exit_contract",
+      "family": "command_adapter",
+      "description": "Judge declared verification commands by explicit exit contract rather than output keywords.",
+      "authority_status": "audit_only",
+      "enforcement_eligible": false,
+      "required_case_classes": [
+        "known_good",
+        "known_bad",
+        "near_miss",
+        "false_positive"
+      ]
+    },
+    {
+      "rule_id": "lineage_anchor_presence",
+      "family": "evidence_lineage",
+      "description": "Require the exact configured lineage anchor rather than a nearby or similarly named artifact.",
+      "authority_status": "audit_only",
+      "enforcement_eligible": false,
+      "required_case_classes": [
+        "known_good",
+        "known_bad",
+        "near_miss",
+        "false_positive"
+      ]
+    },
+    {
+      "rule_id": "doctrine_surface_presence",
+      "family": "doctrine",
+      "description": "Distinguish an actual declared doctrine surface from an empty directory or unrelated binary material.",
+      "authority_status": "audit_only",
+      "enforcement_eligible": false,
+      "required_case_classes": [
+        "known_good",
+        "known_bad",
+        "near_miss",
+        "false_positive"
+      ]
+    },
+    {
+      "rule_id": "project_contract_source_roots",
+      "family": "layout",
+      "description": "Require declared source roots exactly while tolerating harmless extra repository material.",
+      "authority_status": "audit_only",
+      "enforcement_eligible": false,
+      "required_case_classes": [
+        "known_good",
+        "known_bad",
+        "near_miss",
+        "false_positive"
+      ]
+    }
+  ]
+}

@@ -7,6 +7,8 @@ import tempfile
 from .adapters import run_command_gate
 from .config import CommandGateSpec, load_profile
 from .discovery import discover
+from .discrimination import run_discrimination
+from .rule_registry import load_rule_registry
 
 
 def run_self_audit() -> list[str]:
@@ -56,4 +58,20 @@ def run_self_audit() -> list[str]:
             pass
         else:
             failures.append('unqualified enforce authority mode was accepted')
+
+        # CSC v2 self-pressure: registered rules must demonstrate discrimination
+        # before they can even be considered for later enforcement qualification.
+        registry = Path(__file__).resolve().parents[3] / 'engineering/assurance/csc/CSC_RULE_REGISTRY.json'
+        try:
+            rules = load_rule_registry(registry)
+            report = run_discrimination(registry)
+        except Exception as exc:
+            failures.append(f'discrimination self-audit could not execute: {type(exc).__name__}: {exc}')
+        else:
+            if not rules:
+                failures.append('CSC rule registry is empty')
+            if not report.all_discriminated:
+                failures.append('one or more registered CSC rules failed discrimination')
+            if report.enforcement_authority != 'NONE':
+                failures.append('discrimination machinery claimed enforcement authority')
     return failures

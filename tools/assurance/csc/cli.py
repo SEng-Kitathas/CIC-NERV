@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .audit import run_audit
 from .self_audit import run_self_audit
+from .discrimination import run_discrimination, write_discrimination_report
 
 
 def parser() -> argparse.ArgumentParser:
@@ -18,11 +19,31 @@ def parser() -> argparse.ArgumentParser:
     audit.add_argument('--output-root')
 
     sub.add_parser('self-audit')
+
+    discriminate = sub.add_parser('discriminate')
+    discriminate.add_argument(
+        '--registry',
+        default='engineering/assurance/csc/CSC_RULE_REGISTRY.json',
+    )
+    discriminate.add_argument('--output-root')
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.command == 'discriminate':
+        project = Path('.').resolve()
+        registry = Path(args.registry)
+        if not registry.is_absolute():
+            registry = (project / registry).resolve()
+        output = Path(args.output_root).expanduser().resolve() if args.output_root else _default_output()
+        report = run_discrimination(registry)
+        path = write_discrimination_report(report, output)
+        print(path)
+        print(f'all_discriminated={str(report.all_discriminated).lower()}')
+        print('enforcement_authority=NONE')
+        return 0 if report.all_discriminated else 1
+
     if args.command == 'self-audit':
         failures = run_self_audit()
         if failures:
