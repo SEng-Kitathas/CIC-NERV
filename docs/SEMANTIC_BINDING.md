@@ -141,3 +141,42 @@ The runtime remains deliberately non-inferential: RC5 preserves and labels geome
 so later association engines can reason from explicit spatial roles without first
 having to recover what each coordinate meant.
 
+## RC6 — Source Classification, Reported Condition, and Metric Authority
+
+RC6 does not add a new semantic home. It uses the homes already earned by runtime
+pressure to prevent provider vocabularies and provider-reported conditions from
+silently becoming NERV-native truth.
+
+Provider categorical fields such as Open-Meteo weather codes, AviationWeather flight
+category/present-weather expressions, NWS alert event/severity/urgency, and traffic
+event category/severity/probability/time-validity/code fields are projected as
+`FOREIGN_NATIVE` assertions with an explicit `FOREIGN_SEMANTIC_AUTHORITY` provenance
+role. Their local mapping status remains unresolved.
+
+**PROVIDER CLASSIFICATION IS NOT NERV CLASS MEMBERSHIP.**
+
+**FOREIGN CODE IS NOT LOCAL CONDITION WITHOUT AN EXPLICIT CROSSWALK.**
+
+Raw METAR text remains an information artifact. Parsed fields can support distinct
+semantic assertions, but the raw report is not itself world state.
+
+Provider closure booleans are projected as source reports rather than direct physical
+verification. A provider-reported `false` does not prove unrestricted road access or
+absence of lesser lane restrictions.
+
+**PROVIDER REPORT IS NOT DIRECT PHYSICAL VERIFICATION.**
+
+**REPORTED NOT-FULL-CLOSURE IS NOT PROOF OF NO RESTRICTION.**
+
+Provider delay/length values are provider-estimated measurements. Community report
+count is preserved as a count while explicitly refusing to treat plurality as
+independent corroboration, claim confidence, or source reliability.
+
+**SOURCE PLURALITY IS NOT INDEPENDENCE.**
+
+**REPORT COUNT IS NOT CLAIM CONFIDENCE.**
+
+The copied `flight_category` field in `CurrentWeatherEstimateState` remains deliberately
+unprojected because its source-record lineage is not yet explicit enough to reassert it
+without provenance loss.
+

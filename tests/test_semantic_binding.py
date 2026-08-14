@@ -409,3 +409,142 @@ class SemanticBindingRC5Tests(unittest.TestCase):
         self.assertTrue(sign.qualifiers["location_is_not_message_content_location"])
         self.assertTrue(sign.qualifiers["location_does_not_assert_event_location"])
 
+
+class SemanticBindingRC6Tests(unittest.TestCase):
+    def test_open_meteo_weather_code_is_foreign_native_not_local_condition(self):
+        from personal_cic.core.world.components import WeatherState
+        w=WorldState(EventBus()); w.ensure_entity("wx","WX")
+        w.upsert_component("wx",ObservationState("openmeteo.current",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("wx",WeatherState("Test","Open-Meteo","source-t1","America/New_York",80.0,82.0,60.0,0.0,61,50.0,5.0,180.0,10.0))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_weather_code")
+        self.assertEqual(a.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(a.value,61)
+        self.assertTrue(a.qualifiers["code_is_not_local_weather_condition"])
+        self.assertTrue(a.qualifiers["not_local_class_identity"])
+        self.assertNotEqual(a.kind,SemanticKind.STATE_CONDITION)
+
+    def test_foreign_classification_has_distinct_semantic_authority_role(self):
+        from personal_cic.core.world.components import WeatherState
+        from personal_cic.semantics import SemanticSourceRole
+        w=WorldState(EventBus()); w.ensure_entity("wx","WX")
+        w.upsert_component("wx",ObservationState("openmeteo.current",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("wx",WeatherState("Test","Open-Meteo","t1",None,None,None,None,None,3,None,None,None,None))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_weather_code")
+        roles={source.role for source in a.provenance.sources}
+        self.assertIn(SemanticSourceRole.PROVIDER,roles)
+        self.assertIn(SemanticSourceRole.FOREIGN_SEMANTIC_AUTHORITY,roles)
+
+    def test_metar_classifications_are_foreign_native_and_raw_metar_is_artifact(self):
+        from personal_cic.core.world.components import SurfaceObservationNetworkState, SurfaceStationObservation
+        w=WorldState(EventBus()); w.ensure_entity("surface","Surface")
+        w.upsert_component("surface",ObservationState("aviation.surface",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("surface",SurfaceObservationNetworkState("Test","AviationWeather","obs-t1","KCLT",1,70.0,60.0,55.0,0.0,
+            (SurfaceStationObservation("KCLT","Charlotte","obs-t1",35.2,-80.9,5.0,70.0,60.0,55.0,180.0,10.0,None,10.0,30.01,1016.0,5000,"MVFR","-RA BR","KCLT RAW METAR"),)))
+        assertions=project_world_semantics(w)
+        flight=next(x for x in assertions if x.predicate=="flight_category_classification")
+        weather=next(x for x in assertions if x.predicate=="present_weather_classification")
+        raw=next(x for x in assertions if x.predicate=="raw_metar_artifact")
+        self.assertEqual(flight.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(weather.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(raw.kind,SemanticKind.INFORMATION_ARTIFACT)
+        self.assertTrue(raw.qualifiers["raw_text_is_not_world_state"])
+
+    def test_traffic_event_labels_and_codes_remain_foreign_native(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("tomtom.incidents",ObservationAvailability.CURRENT,"retrieved-t2","retrieved-t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","TomTom","tomtom","commercial_event_feed",35,-80,10,1,1,"source-t1",
+            (TrafficEventObservation("r1","tomtom","TomTom","commercial_event_feed","JAM",None,"Jam","I-485",None,None,(),None,None,"start",None,"moderate",None,None,None,"TomTom Traffic","r1","r1","moderate",120,500.0,("I-485",),None,None,"certain","present",("jam",),(101,102),3,"report-t1"),)))
+        assertions=project_world_semantics(w)
+        kind=next(x for x in assertions if x.predicate=="event_type_classification")
+        codes=next(x for x in assertions if x.predicate=="event_code_classification")
+        self.assertEqual(kind.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(codes.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(codes.value,(101,102))
+        self.assertTrue(kind.qualifiers["classification_does_not_create_nerv_class_membership"])
+
+    def test_full_closure_is_provider_report_not_direct_physical_state(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("drivenc",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","NCDOT","drivenc","official",35,-80,10,1,1,"t1",
+            (TrafficEventObservation("r1","drivenc","NCDOT","official","incident",None,"Closure","Road",None,None,(),None,None,None,None,None,True),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_full_closure")
+        self.assertEqual(a.kind,SemanticKind.SOURCE_REPORT)
+        self.assertTrue(a.value)
+        self.assertTrue(a.qualifiers["not_direct_physical_verification"])
+        self.assertTrue(a.qualifiers["report_is_not_local_road_state_authority"])
+        self.assertTrue(a.qualifiers["record_is_not_world_event_identity"])
+
+    def test_flow_road_closure_is_provider_report_not_local_segment_truth(self):
+        from personal_cic.core.world.components import TrafficFlowCollectionState, TrafficFlowProbeObservation
+        w=WorldState(EventBus()); w.ensure_entity("flow","Flow")
+        w.upsert_component("flow",ObservationState("tomtom.flow",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("flow",TrafficFlowCollectionState("Test","TomTom","tomtom","modeled",35,-80,10,1,1,
+            (TrafficFlowProbeObservation("p1","q","tomtom","TomTom","modeled",35.1,-80.8,"nearest","FRC2",20.0,60.0,180,60,0.8,True,"seg",()),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="provider_reports_road_closure")
+        self.assertEqual(a.kind,SemanticKind.SOURCE_REPORT)
+        self.assertTrue(a.value)
+        self.assertTrue(a.qualifiers["not_direct_physical_verification"])
+        self.assertTrue(a.qualifiers["report_is_not_local_road_state_authority"])
+
+    def test_event_delay_and_length_are_provider_estimated_metrics(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("tomtom",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","TomTom","tomtom","commercial",35,-80,10,1,1,"t1",
+            (TrafficEventObservation(
+                source_record_id="r1", source_family="tomtom", provider="TomTom",
+                collection_class="commercial", event_type="jam", event_subtype=None,
+                description="Jam", roadway=None, direction=None, county=None,
+                source_id="r1", upstream_event_id="r1", delay_seconds=120,
+                length_meters=500.0,
+            ),)))
+        assertions=project_world_semantics(w)
+        delay=next(x for x in assertions if x.predicate=="reported_delay")
+        length=next(x for x in assertions if x.predicate=="reported_event_length")
+        self.assertEqual(delay.kind,SemanticKind.MEASUREMENT)
+        self.assertEqual(delay.qualifiers["measurement_kind"],"provider_estimated_event_metric")
+        self.assertEqual(delay.qualifiers["unit"],"second")
+        self.assertEqual(length.qualifiers["unit"],"meter")
+        self.assertTrue(delay.qualifiers["not_direct_physical_measurement"])
+
+    def test_community_report_count_does_not_prove_independence_or_confidence(self):
+        from personal_cic.core.world.components import TrafficEventCollectionState, TrafficEventObservation
+        w=WorldState(EventBus()); w.ensure_entity("events","Events")
+        w.upsert_component("events",ObservationState("tomtom",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("events",TrafficEventCollectionState("Test","TomTom","tomtom","commercial",35,-80,10,1,1,"t1",
+            (TrafficEventObservation(
+                source_record_id="r1", source_family="tomtom", provider="TomTom",
+                collection_class="commercial", event_type="jam", event_subtype=None,
+                description="Jam", roadway=None, direction=None, county=None,
+                source_id="r1", upstream_event_id="r1", community_report_count=7,
+                community_last_report_at="report-t1",
+            ),)))
+        a=next(x for x in project_world_semantics(w) if x.predicate=="community_report_count")
+        self.assertEqual(a.kind,SemanticKind.MEASUREMENT)
+        self.assertEqual(a.value,7)
+        self.assertTrue(a.qualifiers["report_count_is_not_independent_corroboration"])
+        self.assertTrue(a.qualifiers["report_count_is_not_claim_confidence"])
+        self.assertTrue(a.qualifiers["source_plurality_does_not_prove_independence"])
+
+    def test_alert_severity_and_urgency_remain_provider_classifications(self):
+        from personal_cic.core.world.components import WeatherAlertState, WeatherAlertSummary
+        w=WorldState(EventBus()); w.ensure_entity("alerts","Alerts")
+        w.upsert_component("alerts",ObservationState("nws.alerts",ObservationAvailability.CURRENT,"t2","t2"))
+        w.upsert_component("alerts",WeatherAlertState("Test","NWS",1,"Severe","updated",(WeatherAlertSummary("a1","Tornado Warning","Extreme","Immediate","headline","sent","effective","expires"),)))
+        assertions=project_world_semantics(w)
+        sev=next(x for x in assertions if x.predicate=="alert_severity_classification")
+        urg=next(x for x in assertions if x.predicate=="alert_urgency_classification")
+        self.assertEqual(sev.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertEqual(urg.kind,SemanticKind.FOREIGN_NATIVE)
+        self.assertTrue(sev.qualifiers["severity_does_not_equal_local_operational_priority"])
+
+    def test_derived_weather_estimate_does_not_reassert_copied_flight_category_without_lineage(self):
+        from personal_cic.core.world.components import CurrentWeatherEstimateState
+        w=WorldState(EventBus()); w.ensure_entity("estimate","Estimate")
+        w.upsert_component("estimate",CurrentWeatherEstimateState("Test","derived-t3","surface_primary","aviation_surface",1,70.0,60.0,55.0,180.0,10.0,None,10.0,30.01,5000,"MVFR",0.0,None,None,None,None,None))
+        assertions=project_world_semantics(w)
+        copied=[x for x in assertions if x.subject_ref.endswith("current-weather-estimate") and "flight_category" in x.predicate]
+        self.assertEqual(copied,[])
+

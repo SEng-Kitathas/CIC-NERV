@@ -273,6 +273,90 @@ def _collection_scope_assertion(
     )
 
 
+
+
+def _foreign_native_assertion(
+    *,
+    subject: str,
+    predicate: str,
+    value: object,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    identity_parts: tuple[object, ...],
+    semantic_role: str,
+    semantic_authority: str,
+    qualifiers: Mapping[str, Any] | None = None,
+) -> SemanticAssertion:
+    proposition = _proposition(subject, predicate)
+    authority_ref = _source(
+        f"semantic-authority:{semantic_authority}",
+        SemanticSourceRole.FOREIGN_SEMANTIC_AUTHORITY,
+        authority=semantic_authority,
+        native_id=semantic_authority,
+    )
+    sources = provenance.sources
+    if not any(
+        source.role is SemanticSourceRole.FOREIGN_SEMANTIC_AUTHORITY
+        and source.ref_id == authority_ref.ref_id
+        for source in sources
+    ):
+        sources = (*sources, authority_ref)
+    foreign_provenance = SemanticProvenance(
+        SemanticAssertionOrigin.FOREIGN_NATIVE_PRESERVED,
+        sources,
+    )
+    values: dict[str, Any] = {
+        "local_semantic_role": semantic_role,
+        "mapping_status": "unresolved",
+        "foreign_semantic_authority": semantic_authority,
+        "not_local_class_identity": True,
+        "not_local_condition_without_crosswalk": True,
+    }
+    if qualifiers:
+        values.update(qualifiers)
+    return SemanticAssertion(
+        _id(proposition, *identity_parts),
+        proposition,
+        SemanticKind.FOREIGN_NATIVE,
+        "Foreign semantic preservation",
+        subject,
+        predicate,
+        value,
+        foreign_provenance,
+        temporal,
+        _q(values),
+    )
+
+
+def _source_report_assertion(
+    *,
+    subject: str,
+    predicate: str,
+    value: object,
+    provenance: SemanticProvenance,
+    temporal: SemanticTemporalContext,
+    identity_parts: tuple[object, ...],
+    qualifiers: Mapping[str, Any],
+) -> SemanticAssertion:
+    proposition = _proposition(subject, predicate)
+    return SemanticAssertion(
+        _id(proposition, *identity_parts),
+        proposition,
+        SemanticKind.SOURCE_REPORT,
+        "Epistemic assertion",
+        subject,
+        predicate,
+        value,
+        provenance,
+        temporal,
+        _q({
+            **qualifiers,
+            "epistemic_mode": "provider_report",
+            "not_direct_physical_verification": True,
+        }),
+    )
+
+
 def _observation(entity: Entity, state: ObservationState) -> Iterable[SemanticAssertion]:
     adapter = _source(
         f"adapter:{state.adapter_id}",
@@ -479,6 +563,29 @@ def _traffic_flow(
                     qualifiers={**common, "scale_type": "ratio"},
                 )
 
+        if probe.road_closure is not None:
+            yield _source_report_assertion(
+                subject=subject,
+                predicate="provider_reports_road_closure",
+                value=probe.road_closure,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(
+                    observed_at,
+                    probe.provider,
+                    probe.probe_id,
+                    probe.road_closure,
+                    probe.openlr,
+                ),
+                qualifiers={
+                    **common,
+                    "condition_scope": "provider_matched_road_segment",
+                    "matched_segment_reference": probe.openlr,
+                    "false_does_not_prove_unrestricted_road": True,
+                    "report_is_not_local_road_state_authority": True,
+                },
+            )
+
         if probe.confidence is not None:
             proposition = _proposition(subject, "provider-native-confidence")
             foreign_provenance = SemanticProvenance(
@@ -624,6 +731,129 @@ def _traffic_events(
                 },
             )
 
+
+        native_dimensions = (
+            ("event_type_classification", event.event_type, "classification"),
+            ("event_subtype_classification", event.event_subtype, "classification"),
+            ("severity_classification", event.severity, "classification"),
+            ("lanes_affected_classification", event.lanes_affected, "classification_or_source_expression"),
+            ("major_event_classification", event.major_event, "classification"),
+            ("magnitude_of_delay_classification", event.magnitude_of_delay, "classification"),
+            ("probability_of_occurrence_classification", event.probability_of_occurrence, "classification"),
+            ("time_validity_classification", event.time_validity, "classification"),
+            ("event_code_classification", event.event_codes or None, "code_set"),
+        )
+        for predicate, value, semantic_role in native_dimensions:
+            if value is not None:
+                yield _foreign_native_assertion(
+                    subject=record_ref,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    identity_parts=(
+                        event.source_record_id,
+                        source_time,
+                        observed_at,
+                        predicate,
+                        value,
+                    ),
+                    semantic_role=semantic_role,
+                    semantic_authority=event.provider,
+                    qualifiers={
+                        **auth,
+                        "source_family": event.source_family,
+                        "collection_class": event.collection_class,
+                        "source_field_semantics_are_provider_native": True,
+                        "classification_does_not_create_nerv_class_membership": True,
+                    },
+                )
+
+        if event.full_closure is not None:
+            yield _source_report_assertion(
+                subject=record_ref,
+                predicate="provider_reports_full_closure",
+                value=event.full_closure,
+                provenance=provenance,
+                temporal=temporal,
+                identity_parts=(
+                    event.source_record_id,
+                    source_time,
+                    observed_at,
+                    event.full_closure,
+                ),
+                qualifiers={
+                    **auth,
+                    "provider": event.provider,
+                    "source_family": event.source_family,
+                    "condition_scope": "reported_traffic_event",
+                    "adapter_normalized_provider_claim": True,
+                    "record_is_not_world_event_identity": True,
+                    "report_is_not_local_road_state_authority": True,
+                    "false_does_not_assert_no_lane_restriction": True,
+                },
+            )
+
+        for predicate, value, quantity_kind, unit in (
+            ("reported_delay", event.delay_seconds, "duration", "second"),
+            ("reported_event_length", event.length_meters, "length", "meter"),
+        ):
+            if value is not None:
+                yield _measurement(
+                    subject=record_ref,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    quantity_kind=quantity_kind,
+                    unit=unit,
+                    measurement_kind="provider_estimated_event_metric",
+                    identity_parts=(
+                        event.source_record_id,
+                        source_time,
+                        observed_at,
+                        predicate,
+                        value,
+                    ),
+                    qualifiers={
+                        **auth,
+                        "provider": event.provider,
+                        "source_family": event.source_family,
+                        "scale_type": "ratio",
+                        "not_direct_physical_measurement": True,
+                    },
+                )
+
+        if event.community_report_count is not None:
+            yield _measurement(
+                subject=record_ref,
+                predicate="community_report_count",
+                value=event.community_report_count,
+                provenance=provenance,
+                temporal=temporal,
+                quantity_kind="count",
+                unit="count",
+                measurement_kind="provider_reported_count",
+                identity_parts=(
+                    event.source_record_id,
+                    source_time,
+                    observed_at,
+                    event.community_report_count,
+                    event.community_last_report_at,
+                ),
+                qualifiers={
+                    **auth,
+                    "provider": event.provider,
+                    "source_family": event.source_family,
+                    "community_last_report_at": event.community_last_report_at,
+                    "scale_type": "ratio",
+                    "report_count_is_not_independent_corroboration": True,
+                    "report_count_is_not_claim_confidence": True,
+                    "report_count_is_not_source_reliability": True,
+                    "source_plurality_does_not_prove_independence": True,
+                },
+            )
+
         proposition = _proposition(record_ref, "provider_reports_event_record")
         yield SemanticAssertion(
             _id(
@@ -691,6 +921,29 @@ def _weather_state(
         "scale_type": "ratio",
         "not_direct_sensor_claim": True,
     }
+    if state.weather_code is not None:
+        yield _foreign_native_assertion(
+            subject=subject,
+            predicate="provider_weather_code",
+            value=state.weather_code,
+            provenance=provenance,
+            temporal=temporal,
+            identity_parts=(
+                state.provider_observed_at,
+                observed_at,
+                state.provider,
+                state.weather_code,
+            ),
+            semantic_role="weather_classification_code",
+            semantic_authority=state.provider,
+            qualifiers={
+                **auth,
+                "provider_timezone": state.provider_timezone,
+                "code_is_not_local_weather_condition": True,
+                "code_requires_explicit_crosswalk_for_local_condition": True,
+            },
+        )
+
     for prop, value, qk, unit in (
         ("temperature", state.temperature_f, "temperature", "degree_fahrenheit"),
         (
@@ -763,6 +1016,63 @@ def _surface_network(
             "distance_mi": station.distance_mi,
             "scale_type": "ratio",
         }
+
+        for predicate, value, role in (
+            ("flight_category_classification", station.flight_category, "aviation_classification"),
+            ("present_weather_classification", station.present_weather, "weather_code_or_expression"),
+        ):
+            if value is not None:
+                yield _foreign_native_assertion(
+                    subject=subject,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    identity_parts=(
+                        station.station_id,
+                        station.observed_at,
+                        observed_at,
+                        predicate,
+                        value,
+                    ),
+                    semantic_role=role,
+                    semantic_authority=state.provider,
+                    qualifiers={
+                        **auth,
+                        "station_id": station.station_id,
+                        "source_record": record_ref,
+                        "classification_does_not_create_nerv_condition": True,
+                    },
+                )
+
+        if station.raw_metar is not None:
+            proposition = _proposition(subject, "raw_metar_artifact")
+            yield SemanticAssertion(
+                _id(
+                    proposition,
+                    station.station_id,
+                    station.observed_at,
+                    observed_at,
+                    station.raw_metar,
+                ),
+                proposition,
+                SemanticKind.INFORMATION_ARTIFACT,
+                "Epistemic assertion",
+                subject,
+                "raw_metar_artifact",
+                station.raw_metar,
+                provenance,
+                temporal,
+                _q({
+                    **auth,
+                    "provider": state.provider,
+                    "station_id": station.station_id,
+                    "raw_text_is_not_world_state": True,
+                    "raw_text_is_not_automatic_condition_identity": True,
+                    "parsed_fields_require_explicit_semantic_roles": True,
+                }),
+            )
+
         for prop, value, qk, unit in (
             ("temperature", station.temperature_f, "temperature", "degree_fahrenheit"),
             ("dewpoint", station.dewpoint_f, "temperature", "degree_fahrenheit"),
@@ -880,6 +1190,37 @@ def _weather_alerts(
             source_time=alert.sent_at,
             observed_at=observed_at,
         )
+
+        for predicate, value, role in (
+            ("alert_event_classification", alert.event, "hazard_or_alert_classification"),
+            ("alert_severity_classification", alert.severity, "severity_classification"),
+            ("alert_urgency_classification", alert.urgency, "urgency_classification"),
+        ):
+            if value is not None:
+                yield _foreign_native_assertion(
+                    subject=record_ref,
+                    predicate=predicate,
+                    value=value,
+                    provenance=provenance,
+                    temporal=temporal,
+                    identity_parts=(
+                        alert.alert_id,
+                        alert.sent_at,
+                        alert.effective_at,
+                        observed_at,
+                        predicate,
+                        value,
+                    ),
+                    semantic_role=role,
+                    semantic_authority=state.provider,
+                    qualifiers={
+                        **auth,
+                        "provider": state.provider,
+                        "classification_does_not_create_local_hazard_identity": True,
+                        "severity_does_not_equal_local_operational_priority": True,
+                    },
+                )
+
         proposition = _proposition(record_ref, "provider_reports_alert")
         yield SemanticAssertion(
             _id(

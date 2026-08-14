@@ -1,7 +1,7 @@
 {
   "source_artifact": "PERSONAL_CIC_036_003F_QA1_R2_AUTHORITATIVE_SOURCE_2026-08-13.tar.gz",
   "source_sha256": "c06e05389b35bdf0190ef6f54e3057b059d88b95b37e4691a6737b0450dd973f",
-  "integration": "003f semantic binding RC5",
+  "integration": "003f semantic binding RC6",
   "authority": "read-only additive semantic projection",
   "world_snapshot_schema_changed": false,
   "event_journal_schema_changed": false,
@@ -12,9 +12,9 @@
   "semantic_assertion_envelope_changed": true,
   "typed_provenance_added": true,
   "temporal_roles_added": true,
-  "parent_target_verified_commit": "186abde40934325c1d1ab5e4d8319e45e3d3bfc1",
-  "parent_target_verified_tree": "0168bfb7e89e8749bc972ed4a97e8ce18556d1a9",
-  "parent_target_verified_tag": "slice-003f-semantic-binding-rc4-target-verified",
+  "parent_target_verified_commit": "5f6a13beb09811266fe9f38a20814c4240786f20",
+  "parent_target_verified_tree": "b8fb13ed9a68a0e32ddf5ad8b0a9b338ebd9850a",
+  "parent_target_verified_tag": "slice-003f-semantic-binding-rc5-target-verified",
   "authority_freshness_hardening": true,
   "traffic_source_report_binding": true,
   "scoped_negative_evidence_binding": true,
@@ -37,5 +37,13 @@
   "radar_extent_binding": true,
   "reference_geometry_authority_firewall": true,
   "spatial_inference_engine_added": false,
-  "geosparql_runtime_dependency_added": false
+  "geosparql_runtime_dependency_added": false,
+  "provider_classification_preservation": true,
+  "foreign_semantic_authority_role_bound": true,
+  "raw_metar_information_artifact_binding": true,
+  "reported_closure_epistemic_boundary": true,
+  "provider_event_metric_binding": true,
+  "community_report_count_independence_firewall": true,
+  "copied_flight_category_reprojection_deferred": true,
+  "new_semantic_home_added": false
 }
