@@ -514,5 +514,85 @@ class PresentationTests(unittest.TestCase):
         self.assertIn("s since successful retrieval", WORLD_HTML)
 
 
+    def test_semantic_api_exposes_bounded_read_only_assertions_and_filters(self):
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {},
+        )
+        before = self.world.snapshot()
+        server.start()
+        self.addCleanup(server.stop)
+
+        with urlopen(
+            f"http://127.0.0.1:{server.bound_port}/api/v1/semantics?entity=engage-one&kind=measurement&limit=2",
+            timeout=2,
+        ) as response:
+            payload = json.loads(response.read())
+
+        self.assertEqual(payload["api_version"],1)
+        self.assertEqual(payload["presentation"]["mode"],"read-only")
+        self.assertFalse(payload["presentation"]["world_authority"])
+        self.assertFalse(payload["presentation"]["semantic_persistence"])
+        self.assertEqual(payload["filters"]["entity_id"],"engage-one")
+        self.assertEqual(payload["filters"]["kind"],"measurement")
+        self.assertLessEqual(payload["returned_count"],2)
+        self.assertTrue(payload["assertions"])
+        first=payload["assertions"][0]
+        self.assertEqual(first["entity_id"],"engage-one")
+        self.assertEqual(first["kind"],"measurement")
+        self.assertIn("assertion_id",first)
+        self.assertIn("proposition_key",first)
+        self.assertIn("provenance",first)
+        self.assertIn("temporal",first)
+        self.assertIn("qualifiers",first)
+        self.assertEqual(self.world.snapshot(),before)
+
+    def test_semantic_api_rejects_invalid_kind_and_limit(self):
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {},
+        )
+        server.start()
+        self.addCleanup(server.stop)
+        for query in ("kind=not-a-kind", "limit=0", "limit=2001", "limit=abc"):
+            with self.assertRaises(HTTPError) as captured:
+                urlopen(
+                    f"http://127.0.0.1:{server.bound_port}/api/v1/semantics?{query}",
+                    timeout=2,
+                )
+            self.assertEqual(captured.exception.code,400)
+            payload=json.loads(captured.exception.read())
+            self.assertEqual(payload["error"],"invalid_semantic_query")
+
+    def test_semantic_api_head_is_available_and_mutation_remains_rejected(self):
+        server = PresentationServer(
+            world=self.world,
+            host="127.0.0.1",
+            port=0,
+            runtime_metadata=lambda: {},
+        )
+        server.start()
+        self.addCleanup(server.stop)
+        request=Request(
+            f"http://127.0.0.1:{server.bound_port}/api/v1/semantics",
+            method="HEAD",
+        )
+        with urlopen(request,timeout=2) as response:
+            self.assertEqual(response.status,200)
+            self.assertEqual(response.headers.get_content_type(),"application/json")
+        request=Request(
+            f"http://127.0.0.1:{server.bound_port}/api/v1/semantics",
+            data=b"{}",
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as captured:
+            urlopen(request,timeout=2)
+        self.assertEqual(captured.exception.code,405)
+
+
 if __name__ == "__main__":
     unittest.main()

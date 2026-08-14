@@ -11,7 +11,12 @@ from personal_cic.core.config import SiteAnchorConfig
 from personal_cic.core.world import WorldState
 from .pages import SYSTEMS_HTML, WORLD_HTML
 from .traffic_page import TRAFFIC_HTML
-from .projection import build_systems_projection, build_traffic_projection, build_world_projection
+from .projection import (
+    build_semantic_projection,
+    build_systems_projection,
+    build_traffic_projection,
+    build_world_projection,
+)
 from .weather_feed import build_weather_feed
 
 
@@ -172,6 +177,28 @@ def _handler_factory(
             if path == "/api/v1/traffic":
                 self._send_json(build_traffic_projection(world, site_anchor=site_anchor))
                 return
+            if path == "/api/v1/semantics":
+                entity_id = (query.get("entity") or [None])[0]
+                kind = (query.get("kind") or [None])[0]
+                predicate = (query.get("predicate") or [None])[0]
+                raw_limit = (query.get("limit") or ["500"])[0]
+                try:
+                    limit = int(raw_limit)
+                    payload = build_semantic_projection(
+                        world,
+                        entity_id=entity_id,
+                        kind=kind,
+                        predicate=predicate,
+                        limit=limit,
+                    )
+                except (TypeError, ValueError) as exc:
+                    self._send_json(
+                        {"error": "invalid_semantic_query", "detail": str(exc)},
+                        400,
+                    )
+                    return
+                self._send_json(payload)
+                return
             if path == "/radar/latest.png":
                 self._send_cached_png(Path("latest.png"), (query.get("sha") or [None])[0])
                 return
@@ -207,7 +234,7 @@ def _handler_factory(
             elif path == "/static/maplibre/maplibre-gl.css":
                 asset = _MAPLIBRE_VENDOR_DIR / "maplibre-gl.css"
                 self._headers(200 if asset.is_file() else 503, "text/css; charset=utf-8", asset.stat().st_size if asset.is_file() else 0)
-            elif path in ("/api/v1/systems", "/api/v1/world", "/api/v1/traffic"):
+            elif path in ("/api/v1/systems", "/api/v1/world", "/api/v1/traffic", "/api/v1/semantics"):
                 self._headers(200, "application/json; charset=utf-8")
             elif path in ("/radar/latest.png", "/radar/warnings.png", "/radar/legend.png"):
                 filename = {

@@ -180,3 +180,43 @@ The copied `flight_category` field in `CurrentWeatherEstimateState` remains deli
 unprojected because its source-record lineage is not yet explicit enough to reassert it
 without provenance loss.
 
+## RC7 — Live Semantic Inspection + Atomic Projection Boundary
+
+RC7 stops expanding semantic breadth and makes the semantic layer operationally
+inspectable through the loopback presentation boundary.
+
+`GET /api/v1/semantics` exposes a bounded JSON projection of semantic assertions with:
+
+- assertion-instance and proposition identity;
+- owning world-entity reference;
+- semantic kind and native home;
+- subject, predicate, and value;
+- typed provenance sources and derivation reference;
+- independent temporal roles;
+- qualifiers/firewalls.
+
+Exact filters are available for entity, semantic kind, and predicate. Responses are
+bounded by a validated limit (default 500, maximum 2000) and declare projected,
+filtered, returned, and truncation counts.
+
+**THE SEMANTIC API IS AN INSPECTION SURFACE, NOT WORLD AUTHORITY.**
+
+**SERIALIZATION DOES NOT CREATE PERSISTENCE OR A SECOND WRITER.**
+
+### Atomic read boundary
+
+Before RC7, `project_world_semantics()` walked `WorldState.entities` directly. That was
+acceptable while the function was effectively library/test-only, but exposing it to a
+live HTTP reader would allow projection to race collector updates.
+
+RC7 adds `WorldState.read_entities_snapshot()`: a lock-bounded, detached typed entity
+view used by semantic projection. Live semantic reads therefore project one stable
+entity universe rather than iterating the mutable world mapping.
+
+**READ-ONLY DOES NOT MEAN RACE-SAFE BY ITSELF.**
+
+**A LIVE PROJECTION MUST HAVE A DEFINED READ CONSISTENCY BOUNDARY.**
+
+No world snapshot schema, journal schema, semantic persistence, foreign ontology
+runtime, inference engine, or write endpoint is added.
+

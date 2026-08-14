@@ -2124,7 +2124,8 @@ def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
 
 
 def project_world_semantics(world: WorldState) -> tuple[SemanticAssertion, ...]:
+    """Project one stable typed read snapshot; never walk the live entity map."""
     out: list[SemanticAssertion] = []
-    for entity_id in sorted(world.entities):
-        out.extend(project_entity_semantics(world.entities[entity_id]))
+    for entity in world.read_entities_snapshot():
+        out.extend(project_entity_semantics(entity))
     return tuple(out)

@@ -1,9 +1,16 @@
 from datetime import datetime, timezone
 import statistics
-from typing import Any
+from enum import Enum
+from typing import Any, Mapping
 
 from personal_cic.core.config import SiteAnchorConfig
 from personal_cic.core.world import WorldState
+from personal_cic.semantics import (
+    SemanticAssertion,
+    SemanticKind,
+    SemanticSourceRole,
+    project_world_semantics,
+)
 
 
 _HEALTH_ORDER = {
@@ -647,3 +654,119 @@ def build_traffic_projection(
             }
         },
     }
+
+_SEMANTIC_DEFAULT_LIMIT = 500
+_SEMANTIC_MAX_LIMIT = 2000
+
+
+def _semantic_json_value(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Mapping):
+        return {str(key): _semantic_json_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_semantic_json_value(item) for item in value]
+    return value
+
+
+def _semantic_entity_id(assertion: SemanticAssertion) -> str | None:
+    for source in assertion.provenance.sources:
+        if source.role is SemanticSourceRole.WORLD_ENTITY_REFERENCE:
+            return source.native_id or source.ref_id
+    return None
+
+
+def _semantic_assertion_json(assertion: SemanticAssertion) -> dict[str, Any]:
+    return {
+        "assertion_id": assertion.assertion_id,
+        "proposition_key": assertion.proposition_key,
+        "entity_id": _semantic_entity_id(assertion),
+        "kind": assertion.kind.value,
+        "home": assertion.home,
+        "subject_ref": assertion.subject_ref,
+        "predicate": assertion.predicate,
+        "value": _semantic_json_value(assertion.value),
+        "provenance": {
+            "origin": assertion.provenance.origin.value,
+            "derivation_ref": assertion.provenance.derivation_ref,
+            "sources": [
+                {
+                    "ref_id": source.ref_id,
+                    "role": source.role.value,
+                    "authority": source.authority,
+                    "native_id": source.native_id,
+                }
+                for source in assertion.provenance.sources
+            ],
+        },
+        "temporal": {
+            "phenomenon_time": assertion.temporal.phenomenon_time,
+            "source_time": assertion.temporal.source_time,
+            "observed_at": assertion.temporal.observed_at,
+            "retrieved_at": assertion.temporal.retrieved_at,
+            "derived_at": assertion.temporal.derived_at,
+        },
+        "qualifiers": _semantic_json_value(assertion.qualifiers),
+    }
+
+
+def build_semantic_projection(
+    world: WorldState,
+    *,
+    entity_id: str | None = None,
+    kind: str | None = None,
+    predicate: str | None = None,
+    limit: int = _SEMANTIC_DEFAULT_LIMIT,
+) -> dict[str, Any]:
+    """Build a bounded, read-only inspection view over semantic assertions."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not (1 <= limit <= _SEMANTIC_MAX_LIMIT):
+        raise ValueError(f"limit must be an integer from 1 to {_SEMANTIC_MAX_LIMIT}")
+
+    valid_kinds = {item.value for item in SemanticKind}
+    if kind is not None and kind not in valid_kinds:
+        raise ValueError("unknown semantic kind")
+
+    assertions = list(project_world_semantics(world))
+    projected_count = len(assertions)
+
+    if entity_id is not None:
+        assertions = [item for item in assertions if _semantic_entity_id(item) == entity_id]
+    if kind is not None:
+        assertions = [item for item in assertions if item.kind.value == kind]
+    if predicate is not None:
+        assertions = [item for item in assertions if item.predicate == predicate]
+
+    assertions.sort(
+        key=lambda item: (
+            _semantic_entity_id(item) or "",
+            item.home,
+            item.kind.value,
+            item.predicate,
+            item.assertion_id,
+        )
+    )
+    total_count = len(assertions)
+    selected = assertions[:limit]
+
+    return {
+        "api_version": 1,
+        "presentation": {
+            "mode": "read-only",
+            "generated_at": _now_iso(),
+            "world_authority": False,
+            "semantic_persistence": False,
+            "semantic_projection_source": "stable_typed_world_read_snapshot",
+        },
+        "filters": {
+            "entity_id": entity_id,
+            "kind": kind,
+            "predicate": predicate,
+            "limit": limit,
+        },
+        "projected_count": projected_count,
+        "total_count": total_count,
+        "returned_count": len(selected),
+        "truncated": total_count > len(selected),
+        "assertions": [_semantic_assertion_json(item) for item in selected],
+    }
+

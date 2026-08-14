@@ -139,3 +139,18 @@ data substrate where remote providers refresh local assets rather than owning li
 Human-facing claims still require human-perception evidence. A static/API test can prove structure; it
 cannot prove legibility, interaction quality, or that the rendered map is operationally usable.
 
+## Semantic inspection API
+
+The loopback presentation server exposes `GET`/`HEAD /api/v1/semantics` as a read-only
+inspection surface over NERV semantic assertions. Optional query parameters are:
+
+- `entity=<world-entity-id>`
+- `kind=<semantic-kind>`
+- `predicate=<exact-predicate>`
+- `limit=<1..2000>` (default `500`)
+
+The endpoint is intentionally bounded and non-persistent. It does not alter WorldState,
+create semantic graph authority, or accept mutation verbs. Semantic projection uses a
+stable typed WorldState read snapshot so collection threads cannot mutate the entity
+universe during one request.
+

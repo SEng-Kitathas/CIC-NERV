@@ -1,5 +1,6 @@
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
+from copy import deepcopy
 import json
 from threading import RLock
 from typing import Any, Literal
@@ -69,6 +70,24 @@ class WorldState:
                 for entity in self.entities.values()
                 if entity.has(*component_types)
             ]
+
+    def read_entities_snapshot(self) -> tuple[Entity, ...]:
+        """Return a stable typed read view without exposing the live entity mapping.
+
+        Presentation/semantic readers need component types, not only JSON.  Copy the
+        entity records while holding the world lock so a projection cannot observe a
+        half-updated entity universe or iterate a mapping being mutated by collectors.
+        The returned entities are detached from WorldState authority.
+        """
+        with self._lock:
+            return tuple(
+                Entity(
+                    entity_id=entity.entity_id,
+                    label=entity.label,
+                    components=deepcopy(entity.components),
+                )
+                for entity_id, entity in sorted(self.entities.items())
+            )
 
     @staticmethod
     def _component_json(component: Any) -> Any:

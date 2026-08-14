@@ -548,3 +548,29 @@ class SemanticBindingRC6Tests(unittest.TestCase):
         copied=[x for x in assertions if x.subject_ref.endswith("current-weather-estimate") and "flight_category" in x.predicate]
         self.assertEqual(copied,[])
 
+
+class SemanticBindingRC7Tests(unittest.TestCase):
+    def test_world_semantic_projection_consumes_typed_read_snapshot_not_live_mapping(self):
+        from personal_cic.core.world.entity import Entity
+        entity=Entity("snapshot-only","Snapshot Only")
+        entity.set_component(ObservationState("test",ObservationAvailability.CURRENT,"t1","t1"))
+        class SnapshotOnlyWorld:
+            def read_entities_snapshot(self):
+                return (entity,)
+            @property
+            def entities(self):
+                raise AssertionError("live entity mapping must not be touched")
+        assertions=project_world_semantics(SnapshotOnlyWorld())
+        self.assertTrue(assertions)
+        self.assertTrue(any(x.subject_ref=="snapshot-only" for x in assertions))
+
+    def test_typed_entity_snapshot_is_detached_from_later_world_updates(self):
+        w=WorldState(EventBus()); w.ensure_entity("e","Before")
+        w.upsert_component("e",ObservationState("a",ObservationAvailability.CURRENT,"t1","t1"))
+        snap=w.read_entities_snapshot()
+        w.ensure_entity("e","After")
+        w.upsert_component("e",ObservationState("a",ObservationAvailability.UNAVAILABLE,"t2","t1",("lost",)))
+        self.assertEqual(snap[0].label,"Before")
+        self.assertEqual(snap[0].get(ObservationState).availability,ObservationAvailability.CURRENT)
+        self.assertEqual(w.get_component("e",ObservationState).availability,ObservationAvailability.UNAVAILABLE)
+
