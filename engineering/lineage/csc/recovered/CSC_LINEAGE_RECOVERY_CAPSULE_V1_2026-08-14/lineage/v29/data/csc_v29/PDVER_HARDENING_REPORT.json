@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-07-29T23:20:14.644372+00:00",
+  "tool_name": "CSC",
+  "design_rule": "PDVER",
+  "probe": "scan whole lab code surface plus required CSC SOP and repaired-archive surfaces for structural cleanup findings, anti-pattern residue, style/idiom drift, and boundary/typing drift",
+  "derive": "use tri-doctrine invariants: theoretical maximum pressure, typed boundaries, evidence-before-inference, holonic clarity, continuity/archive integrity, anti-pattern inversion, and lifecycle-aware retention",
+  "verify": "profile-aware verification battery; CTO profile uses compileall + extension surface existence + manifest parse + governance surface existence + CSC entrypoint help",
+  "embody": "writes cycle report only; code corrections are expected to have been applied before or between CSC cycles",
+  "recurse": "rerun whole-surface probe/verify until findings are empty or max cycle count is reached, while explicitly self-auditing CSC core files",
+  "coverage_notes": [
+    "scans Python and Rust code surfaces, required local CSC SOP docs, and the repaired PCMMAD archive surface",
+    "uses AST-aware Python checks plus Rust/TOML text-pattern checks for unwrap/expect/panic/todo/unimplemented/dbg usage, path hygiene, and doctrine drift",
+    "includes CSC self-audit so the tool must remain cleaner than the lab it judges"
+  ],
+  "cycles": [
+    {
+      "cycle": 1,
+      "ts": "2026-07-29T23:20:14.639106+00:00",
+      "probe_findings": [],
+      "finding_summary": [],
+      "verification": [
+        {
+          "name": "compileall_runtime",
+          "return_code": 0,
+          "ok": true,
+          "stdout_tail": "Listing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/baseline/pcmmad_receiver'...\n",
+          "stderr_tail": ""
+        },
+        {
+          "name": "compileall_tools",
+          "return_code": 0,
+          "ok": true,
+          "stdout_tail": "Listing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/tools/csc_native'...\n",
+          "stderr_tail": ""
+        },
+        {
+          "name": "compileall_system",
+          "return_code": 0,
+          "ok": true,
+          "stdout_tail": "Listing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/system'...\nListing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/system/constraint_pipeline'...\nListing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/system/constraint_pipeline/profiles'...\n",
+          "stderr_tail": ""
+        },
+        {
+          "name": "receiver_schema_authority_gate",
+          "return_code": 0,
+          "ok": true,
+          "stdout_tail": "{\"report\": \"/mnt/data/pcmmad_v29_work/PCMMAD_receiver/reports/RECEIVER_SCHEMA_AUTHORITY_GATE_REPORT.json\", \"clean\": true}\n",
+          "stderr_tail": ""
+        },
+        {
+          "name": "receiver_baseline_selftest_gate",
+          "return_code": 0,
+          "ok": true,
+          "stdout_tail": "{\n  \"created_at_utc\": \"2026-07-29T23:20:14.512866+00:00\",\n  \"clean\": true,\n  \"baseline_root\": \"/mnt/data/pcmmad_v29_work/PCMMAD_receiver/baseline\",\n  \"compile_result\": {\n    \"name\": \"baseline_compileall\",\n    \"command\": [\n      \"/opt/pyvenv/bin/python\",\n      \"-m\",\n      \"compileall\",\n      \"/mnt/data/pcmmad_v29_work/PCMMAD_receiver/baseline/pcmmad_receiver\"\n    ],\n    \"return_code\": 0,\n    \"ok\": true,\n    \"stdout_tail\": \"Listing '/mnt/data/pcmmad_v29_work/PCMMAD_receiver/baseline/pcmmad_receiver'...\\n\",\n    \"stderr_tail\": \"\"\n  },\n  \"hardening_tests\": {\n    \"name\": \"server_hardening_tests\",\n    \"command\": [\n      \"/opt/pyvenv/bin/python\",\n      \"-m\",\n      \"unittest\",\n      \"tests.test_server_hardening\"\n    ],\n    \"return_code\": 0,\n    \"ok\": true,\n    \"stdout_tail\": \"\",\n    \"stderr_tail\": \"........\\n----------------------------------------------------------------------\\nRan 8 tests in 0.674s\\n\\nOK\\n\"\n  },\n  \"import_probe\": {\n    \"ok\": true,\n    \"route_count\": 49,\n    \"tool_count\": 87,\n    \"health_ok\": true,\n    \"preflight_ok\": true,\n    \"envelope_ok\": true,\n    \"envelope\": {\n      \"ok\": true,\n      \"status\": \"COMPLETED\",\n      \"return_code\": 0,\n      \"command\": [\n        \"/opt/pyvenv/bin/python\",\n        \"-c\",\n        \"print(\\\"selftest\\\")\"\n      ],\n      \"cwd\": \"/mnt/data/pcmmad_v29_work/PCMMAD_receiver\",\n      \"stdout\": \"selftest\\n\",\n      \"stderr\": \"\",\n      \"stdout_truncated\": false,\n      \"stderr_truncated\": false,\n      \"duration_ms\": 620,\n      \"error\": null\n    },\n    \"encoded_has_path\": true,\n    \"return_code\": 0,\n    \"stderr_tail\": \"\"\n  }\n}\n",
+          "stderr_tail": ""
+        }
+      ],
+      "csc_self_audit": {
+        "clean": true,
+        "checked_files": [],
+        "findings": []
+      },
+      "remediation_actions": [],
+      "cycle_clean": true
+    }
+  ],
+  "final_cycle_clean": true
+}

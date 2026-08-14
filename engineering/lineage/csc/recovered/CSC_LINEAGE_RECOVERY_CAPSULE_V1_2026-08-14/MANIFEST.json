@@ -1,0 +1,413 @@
+{
+  "format": "cic.csc-lineage-recovery-capsule.v1",
+  "created_date": "2026-08-14",
+  "outer_upload": {
+    "name": "what i could find.zip",
+    "sha256": "2faa7827df98fb185c8a932d66b61efb98091145fe64f7e5b604f1de4c7d498f",
+    "bytes": 81129962
+  },
+  "archive_inventory": {
+    "Aedifex-Bellator Project.zip": {
+      "sha256": "e708276d252a0c9bf609cf029d1cd46ca171046beea065b8021eee82e2fa1e67",
+      "bytes": 5954828,
+      "file_count": 70,
+      "root": "structural_patch_repair_verification(1).json"
+    },
+    "PCMMAD_RECEIVER_V28_PDVER_REFACTOR.zip": {
+      "sha256": "0b024d46eadd96be43d609898874e3c051bb7a8941d33be5ac848b7271571f54",
+      "bytes": 1112810,
+      "file_count": 489,
+      "root": "PCMMAD_receiver",
+      "expected_sha256": "0b024d46eadd96be43d609898874e3c051bb7a8941d33be5ac848b7271571f54",
+      "hash_match": true
+    },
+    "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip": {
+      "sha256": "5baf9b66a9137d950aeabac2ea76fbbb919e177f90788e5341ee6e15a80b89d8",
+      "bytes": 711638,
+      "file_count": 221,
+      "root": "PCMMAD_receiver",
+      "expected_sha256": "5baf9b66a9137d950aeabac2ea76fbbb919e177f90788e5341ee6e15a80b89d8",
+      "hash_match": true
+    },
+    "PCMMAD_receiver.zip": {
+      "sha256": "b4d8a284a0acc9ef37aa115d2be4e4b67550730d80555e06771bc41c820564a3",
+      "bytes": 53939580,
+      "file_count": 2536,
+      "root": "PCMMAD_receiver",
+      "expected_sha256": "b4d8a284a0acc9ef37aa115d2be4e4b67550730d80555e06771bc41c820564a3",
+      "hash_match": true
+    },
+    "RAHL_ENGINEERING_DOCTRINE_vNEXT_CANDIDATE_2026-08-10.zip": {
+      "sha256": "1e46a71a5cf39b47d1a73f5643618e26c50f0b25fea92d4adeab9453e0f040cd",
+      "bytes": 47536,
+      "file_count": 21,
+      "root": "rahl_engineering_doctrine_vnext_candidate_2026-08-10"
+    },
+    "RAHL_ENGINEERING_DOCTRINE_vNEXT_PASS7_CODEX_RC2_SEMANTIC_HOME_2026-08-10.zip": {
+      "sha256": "62f2492e572f01bdcef07f5f090b5f24b83327aef1ad8425ce9b8d7be7fcb541",
+      "bytes": 212502,
+      "file_count": 85,
+      "root": "rahl_engineering_doctrine_vnext_pass7_codex_rc2_semantic_home_2026-08-10"
+    },
+    "e drive csc alternate.zip": {
+      "sha256": "a0a907d4e1de95ff454fc3af8d1e66e5b3b361d0ce429742377264a265a4d8ec",
+      "bytes": 14040285,
+      "file_count": 3781,
+      "root": "e drive csc alternate",
+      "expected_sha256": "a0a907d4e1de95ff454fc3af8d1e66e5b3b361d0ce429742377264a265a4d8ec",
+      "hash_match": true
+    },
+    "e drive csc.zip": {
+      "sha256": "4366bacf617f99c8a415dce37abc211bdaa504c6cd79fde252064e58079b6c22",
+      "bytes": 6556644,
+      "file_count": 1705,
+      "root": "e drive csc"
+    },
+    "genesis_omega_canon_v1.8.0_authority.zip": {
+      "sha256": "5082f93af1212f7b9848a7bd0bab598e353575354b87c74e9fafa0434b71ce40",
+      "bytes": 1444949,
+      "file_count": 169,
+      "root": "genesis_omega_canon"
+    },
+    "genesis_omega_canon_v1.9.0.zip": {
+      "sha256": "bfcef471447c66bba8404de23f86c13c762cb6a4873b530d316f24a095242cdd",
+      "bytes": 1469619,
+      "file_count": 189,
+      "root": "genesis_omega_canon_v1.9.0"
+    }
+  },
+  "forensic_comparison": {
+    "e_drive_main_paths": 1705,
+    "e_drive_alternate_paths": 3781,
+    "common_paths": 1705,
+    "byte_identical_common_paths": 1645,
+    "different_common_paths": 60,
+    "main_only_paths": 0,
+    "alternate_only_paths": 2076,
+    "universal_csc_python_files": 11,
+    "universal_csc_identical_main_vs_alternate": true,
+    "key_core_hash_matrix": {
+      "csc_native/csc_universal_runner.py": {
+        "e_drive_main": "b7b3255bd938bd41a8720db756a496778db9d3ef5254695816094de40c89fc3c",
+        "e_drive_alternate": "0f519f563561bc64864218071b2cd4ab1255da1acb8a6c1fd58344ad745411f9",
+        "v28": "0f519f563561bc64864218071b2cd4ab1255da1acb8a6c1fd58344ad745411f9",
+        "v29": "0f519f563561bc64864218071b2cd4ab1255da1acb8a6c1fd58344ad745411f9"
+      },
+      "csc_native/csc_gate.py": {
+        "e_drive_main": "42c8ab8875896e981e0025ed988a3b158cd159268010ec0cf37cc5eea4da2830",
+        "e_drive_alternate": "42c8ab8875896e981e0025ed988a3b158cd159268010ec0cf37cc5eea4da2830",
+        "v28": "42c8ab8875896e981e0025ed988a3b158cd159268010ec0cf37cc5eea4da2830",
+        "v29": "42c8ab8875896e981e0025ed988a3b158cd159268010ec0cf37cc5eea4da2830"
+      },
+      "csc_native/code_slop_cleanup_csc.py": {
+        "e_drive_main": "5e36506ae3c917bf294323c767409772cb0090a6c6834f2502cdc40381120ece",
+        "e_drive_alternate": "5e36506ae3c917bf294323c767409772cb0090a6c6834f2502cdc40381120ece",
+        "v28": "5e36506ae3c917bf294323c767409772cb0090a6c6834f2502cdc40381120ece",
+        "v29": "5e36506ae3c917bf294323c767409772cb0090a6c6834f2502cdc40381120ece"
+      },
+      "csc_native/csc_doctrine_passes.py": {
+        "e_drive_main": "ba3e3e5d810b96444f023a003f8614c169c2af3c5733ff94533c9c579270ea84",
+        "e_drive_alternate": "ba3e3e5d810b96444f023a003f8614c169c2af3c5733ff94533c9c579270ea84",
+        "v28": "ba3e3e5d810b96444f023a003f8614c169c2af3c5733ff94533c9c579270ea84",
+        "v29": "ba3e3e5d810b96444f023a003f8614c169c2af3c5733ff94533c9c579270ea84"
+      },
+      "csc_native/guide_quality_audit.py": {
+        "e_drive_main": "6e0979bb2ebd4e77e45fdbf53af01f8ac6d2e032b8625c5d980bb6bd4d4f025f",
+        "e_drive_alternate": "6e0979bb2ebd4e77e45fdbf53af01f8ac6d2e032b8625c5d980bb6bd4d4f025f",
+        "v28": "6e0979bb2ebd4e77e45fdbf53af01f8ac6d2e032b8625c5d980bb6bd4d4f025f",
+        "v29": "6e0979bb2ebd4e77e45fdbf53af01f8ac6d2e032b8625c5d980bb6bd4d4f025f"
+      },
+      "csc_native/codex_unified_loc_compliance_audit.py": {
+        "e_drive_main": "40deb0099443b28dd9ae08cac19213aeed7ad1f5e54afe4f9606d8f7f85f9431",
+        "e_drive_alternate": "40deb0099443b28dd9ae08cac19213aeed7ad1f5e54afe4f9606d8f7f85f9431",
+        "v28": "40deb0099443b28dd9ae08cac19213aeed7ad1f5e54afe4f9606d8f7f85f9431",
+        "v29": "40deb0099443b28dd9ae08cac19213aeed7ad1f5e54afe4f9606d8f7f85f9431"
+      },
+      "csc_native/strict_json_boundary.py": {
+        "e_drive_main": "ec36a9596d6069c3481b645b51e8024070e297d0c77251716de1c5c832bd4d87",
+        "e_drive_alternate": "ec36a9596d6069c3481b645b51e8024070e297d0c77251716de1c5c832bd4d87",
+        "v28": "ec36a9596d6069c3481b645b51e8024070e297d0c77251716de1c5c832bd4d87",
+        "v29": "ec36a9596d6069c3481b645b51e8024070e297d0c77251716de1c5c832bd4d87"
+      }
+    }
+  },
+  "selected_members": [
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/__init__.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/__init__.py",
+      "sha256": "b70a1f168631d608c18b2a29a120ec5e443f2451d32e292e8d835f98acd7d7e8"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/adapters.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/adapters.py",
+      "sha256": "59a6569ff50391b71d1208f3c10d835e618aa1c7df08b521fbebace54bdf1617"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/cli.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/cli.py",
+      "sha256": "440454442602432ba1751dc4aaf8667bcd425fca4eb94337c85db2f00a9c734c"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/config.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/config.py",
+      "sha256": "15967f464b10ea7aed7732ac3240e65cbce84244a1cf8cd85ae72fdfe7c9e50b"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/discovery.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/discovery.py",
+      "sha256": "a2ce9fbe6cd4137f18d5e7e180fc56cd55bcdb7d00f6ad75051ae3d69349bb1d"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/doctrine.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/doctrine.py",
+      "sha256": "61c78cfdc33360f1abfe4ef28069fa9451f8e79fcbbaa646c31a36598ea21951"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/gates.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/gates.py",
+      "sha256": "a75d7150b70fa16769db22a800c117326f5b0291a64de308db36c470c7133385"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/json_io.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/json_io.py",
+      "sha256": "4d69e80469d8ec6b288b51191034607ab5451ee45ec6b0bce93d0ac9845ba689"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/model.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/model.py",
+      "sha256": "383d8191383b45c6a0ea9739a08d5dd88679c8cb02e2af6062a4223691380a41"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/reporting.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/reporting.py",
+      "sha256": "198a666bc7e9b7d7791c3254fadefa5184a4740e6a00be5387814750f671d8be"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "universal_csc/research.py",
+      "capsule_path": "donors/e_drive_alternate/universal_csc/research.py",
+      "sha256": "c72f1e81592b1c70a0cb7309ad47c2c4348e3d09e7da382be48ee3e35b5d2219"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "UNIVERSAL_CSC_FINALIZER/README.md",
+      "capsule_path": "donors/e_drive_alternate/UNIVERSAL_CSC_FINALIZER/README.md",
+      "sha256": "d263afc91a22dc6fea2f10a7f3ea5b8bf63c8a11ec8ee87f7c0ae28ba9068690"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_project.json",
+      "capsule_path": "donors/e_drive_alternate/csc_project.json",
+      "sha256": "4d651bca0e8c586614c902c8d228320480d6f92873e2122fe864e1e8988a6be4"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/csc_universal_runner.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/csc_universal_runner.py",
+      "sha256": "0f519f563561bc64864218071b2cd4ab1255da1acb8a6c1fd58344ad745411f9"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/csc_gate.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/csc_gate.py",
+      "sha256": "42c8ab8875896e981e0025ed988a3b158cd159268010ec0cf37cc5eea4da2830"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/code_slop_cleanup_csc.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/code_slop_cleanup_csc.py",
+      "sha256": "5e36506ae3c917bf294323c767409772cb0090a6c6834f2502cdc40381120ece"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/csc_doctrine_passes.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/csc_doctrine_passes.py",
+      "sha256": "ba3e3e5d810b96444f023a003f8614c169c2af3c5733ff94533c9c579270ea84"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/csc_runtime_bindings.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/csc_runtime_bindings.py",
+      "sha256": "155871493f37c4afd8b1b87caf6c91164cedfd2204d09dedfc94d464a9f3ebb0"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/csc_doctrine_manifest.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/csc_doctrine_manifest.py",
+      "sha256": "a192ed9e9b7b0be1d59a76f5b90a64087dd1ffc92f486e24ce36920a2ab9f9f6"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/guide_quality_audit.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/guide_quality_audit.py",
+      "sha256": "6e0979bb2ebd4e77e45fdbf53af01f8ac6d2e032b8625c5d980bb6bd4d4f025f"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/codex_unified_loc_compliance_audit.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/codex_unified_loc_compliance_audit.py",
+      "sha256": "40deb0099443b28dd9ae08cac19213aeed7ad1f5e54afe4f9606d8f7f85f9431"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/pdver_lab_hardening_cycle.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/pdver_lab_hardening_cycle.py",
+      "sha256": "f7f4e283d18d6690957a45e46f03699552cff57b4241ed62112dfe285d471bab"
+    },
+    {
+      "source_archive": "e drive csc alternate.zip",
+      "source_path": "csc_native/strict_json_boundary.py",
+      "capsule_path": "donors/e_drive_alternate/csc_native/strict_json_boundary.py",
+      "sha256": "ec36a9596d6069c3481b645b51e8024070e297d0c77251716de1c5c832bd4d87"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/00_CSC_START_AND_AUTHORITY.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/00_CSC_START_AND_AUTHORITY.md",
+      "sha256": "c273cb834156e46a1859af8e8508f55f6c00ab25ad3dc602416395b86d9dacd9"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/01_CSC_DOCTRINE_LINKAGE.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/01_CSC_DOCTRINE_LINKAGE.md",
+      "sha256": "98687fd6922bcb40b052a15580c2fb6a53cf5223b7e55f87170c704b34ad5ba0"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/02_CSC_HOLONIC_AUDIT_SOP.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/02_CSC_HOLONIC_AUDIT_SOP.md",
+      "sha256": "5c32b820d47ca490a0c286be8600536c3ad2e5f2fc039a9e209b5d74064654d8"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/03_CSC_ANTI_PATTERN_INVERSION_SOP.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/03_CSC_ANTI_PATTERN_INVERSION_SOP.md",
+      "sha256": "57253efd1488ba7f9a2dc4df74e4d51d022307f0589d3caa4ccec2ebee995a7c"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/04_CSC_PROMOTION_AND_RECURSION_SOP.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/04_CSC_PROMOTION_AND_RECURSION_SOP.md",
+      "sha256": "f8f87a47b1b4e23346fc60a24badfa4150895611ea0465fad80203ad850a7c18"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/05_CSC_REQUIRED_SOP_SET.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/05_CSC_REQUIRED_SOP_SET.md",
+      "sha256": "8736411fe0831a227c9ae1895bf0112405171ae988ec170f493f8a7315ce21f1"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/06_CSC_TRI_DOCTRINE_AUTHORITY.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/06_CSC_TRI_DOCTRINE_AUTHORITY.md",
+      "sha256": "5d19072be496d75f487dd93d01041ee03b8e783b9757ad0209290d10c92b6433"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/07_CSC_TRI_DOCTRINE_COVERAGE_POLICY.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/07_CSC_TRI_DOCTRINE_COVERAGE_POLICY.md",
+      "sha256": "121bb1f2c40722c238e783e229f46d26c73abfed792b57022cf6e3c00e3cb463"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/08_CSC_IDIOMATIC_EXPRESSION_SOP.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/08_CSC_IDIOMATIC_EXPRESSION_SOP.md",
+      "sha256": "402936f72a59ae3ed35defad16b43f4c61884c4d49ab5be449c2d04dfad33fa5"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/09_CSC_SOP_FRESHNESS_AND_MUTATION_LAG_SOP.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/09_CSC_SOP_FRESHNESS_AND_MUTATION_LAG_SOP.md",
+      "sha256": "2ed25789bb015f0cf0ee2f2f8f38b5b1e1b3e41bbb33646dcc78e64f0d717c1e"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/10_CSC_GENERAL_GUIDE_AND_UNIVERSALIZATION.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/10_CSC_GENERAL_GUIDE_AND_UNIVERSALIZATION.md",
+      "sha256": "c21ed9a851095a325b4843ceb14e9b9251daeefa42b87f6e3c7a9e916bd3fd88"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/csc_sop/11_CSC_SERVER_EXECUTION_METHODOLOGY_FOR_UNRELIABLE_PLANES.md",
+      "capsule_path": "doctrine/v29/docs/csc_sop/11_CSC_SERVER_EXECUTION_METHODOLOGY_FOR_UNRELIABLE_PLANES.md",
+      "sha256": "903745581bb434da787bbe3dc8043ccc7f77ef0a9c3453fb3e1908990c2b072c"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/ergo_foundations/UNIFIED_CODE_STANDARDS_AGNOSTIC_2026-04-11.md",
+      "capsule_path": "lineage/v29/docs/ergo_foundations/UNIFIED_CODE_STANDARDS_AGNOSTIC_2026-04-11.md",
+      "sha256": "6d5355d7c0e893a7af0de3cf20d7ac97f5c3a7126f285999b742322b2bb62532"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/ergo_foundations/UNIFIED_CODE_STANDARDS_DOCTRINE_v1.2.md",
+      "capsule_path": "lineage/v29/docs/ergo_foundations/UNIFIED_CODE_STANDARDS_DOCTRINE_v1.2.md",
+      "sha256": "a00fc7c36b5a090c131e0b02eb8a7fb8352f04c53696400b8635eeba8c29f5c2"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "reports/V29_REFACTOR_AUDIT.md",
+      "capsule_path": "lineage/v29/reports/V29_REFACTOR_AUDIT.md",
+      "sha256": "c6f1be0356b96cc760d90d2b182befd8f1e95e7a5a82bf7ead5dfa724a3c950f"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "reports/V29_RELEASE_VERIFICATION.json",
+      "capsule_path": "lineage/v29/reports/V29_RELEASE_VERIFICATION.json",
+      "sha256": "2197ca746a719fd8499f51421ebb87a2093a7b0819b643aba07144f8ffab7345"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "data/csc_v29/CSC_EVENT_REPORT.json",
+      "capsule_path": "lineage/v29/data/csc_v29/CSC_EVENT_REPORT.json",
+      "sha256": "9b893384626e88d24771b36b1076d2fe5a180d4f5f5bb66427cba5a47d7ddd0d"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "data/csc_v29/PDVER_HARDENING_REPORT.json",
+      "capsule_path": "lineage/v29/data/csc_v29/PDVER_HARDENING_REPORT.json",
+      "sha256": "166985f993f197748356fb2216e814068bec4a4ac7ceeaf7aed45397592a4fe9"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V29_NATIVE_PROTOCOL_RC1.zip",
+      "source_path": "docs/verification/RELEASE_CONTRACT.md",
+      "capsule_path": "lineage/v29/docs/verification/RELEASE_CONTRACT.md",
+      "sha256": "692e9134f41b7790877b55f366eb573cd17887e85bc2d0c0dd4e13a8b78678b3"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V28_PDVER_REFACTOR.zip",
+      "source_path": "RELEASE.json",
+      "capsule_path": "lineage/v28/RELEASE.json",
+      "sha256": "5eb7d1c80168ce93e5c2c317125de8f9a23adb15c5b5714bc375ac41c40118bf"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V28_PDVER_REFACTOR.zip",
+      "source_path": "csc_project.json",
+      "capsule_path": "lineage/v28/csc_project.json",
+      "sha256": "27cf895a66296fad4282cd9ae9128769ad7667660ba47f7c3dc997bac33930ca"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V28_PDVER_REFACTOR.zip",
+      "source_path": "data/csc_v28/CSC_EVENT_REPORT.json",
+      "capsule_path": "lineage/v28/data/csc_v28/CSC_EVENT_REPORT.json",
+      "sha256": "98ef88045f3d040e9b3689a0f85b961560c4c01d033f2ad30e6dc2e88e0e1ad9"
+    },
+    {
+      "source_archive": "PCMMAD_RECEIVER_V28_PDVER_REFACTOR.zip",
+      "source_path": "data/csc_v28/PDVER_HARDENING_REPORT.json",
+      "capsule_path": "lineage/v28/data/csc_v28/PDVER_HARDENING_REPORT.json",
+      "sha256": "64c17e7e95bd25a686de9e8cb962679370987d26fbc6735f15a1415a8748341a"
+    }
+  ],
+  "authority_note": "This capsule is a forensic donor/lineage specimen only. It is not yet CIC runtime authority and must not be included in a CIC production install."
+}

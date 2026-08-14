@@ -1,0 +1,160 @@
+{
+  "created_at_utc": "2026-07-29T23:20:14.988682+00:00",
+  "release": "PCMMAD Receiver V29 Native Protocol Release Candidate",
+  "clean": true,
+  "commands": [
+    {
+      "name": "compileall",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "baseline",
+        "tests",
+        "tools",
+        "system"
+      ],
+      "return_code": 0,
+      "clean": true,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "regression_tests",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py"
+      ],
+      "return_code": 0,
+      "clean": true,
+      "stdout_tail": "",
+      "stderr_tail": "........................................\n----------------------------------------------------------------------\nRan 40 tests in 2.224s\n\nOK\n"
+    },
+    {
+      "name": "runtime_surface_contract",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/runtime_surface_contract.py"
+      ],
+      "return_code": 0,
+      "clean": true,
+      "stdout_tail": "{\n  \"report\": \"/mnt/data/pcmmad_v29_work/PCMMAD_receiver/reports/PCMMAD_RUNTIME_SURFACE_CONTRACT.json\",\n  \"clean\": true,\n  \"counts\": {\n    \"routes\": 49,\n    \"tools\": 87,\n    \"protocol_tools\": 12,\n    \"operations\": 30\n  }\n}\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "csc_universal",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/csc_native/csc_universal_runner.py",
+        "--target-project-root",
+        "/mnt/data/pcmmad_v29_work/PCMMAD_receiver",
+        "--output-root",
+        "/mnt/data/pcmmad_v29_work/PCMMAD_receiver/data/csc_v29",
+        "--docs-root",
+        "/mnt/data/pcmmad_v29_work/PCMMAD_receiver/docs/csc_sop",
+        "--max-cycles",
+        "1"
+      ],
+      "return_code": 0,
+      "clean": true,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    }
+  ],
+  "manifest_contract": {
+    "clean": true,
+    "path": "PACKAGE_MANIFEST_V29.json",
+    "failures": []
+  },
+  "source_contract": {
+    "clean": true,
+    "path": "reports/source_review/V29_SOURCE_CORPUS_INVENTORY.json",
+    "forge_documents_reviewed": 14,
+    "gain_decisions": 9
+  },
+  "gate_report_contract": {
+    "clean": true,
+    "reports": [
+      {
+        "path": "RECEIVER_BASELINE_SELFTEST_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_SCHEMA_AUTHORITY_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "SEMANTIC_FOOTGUN_DATAFLOW_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_FULL_ROUTE_TRACE_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_NEGATIVE_CONTRACT_TRACE_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_STATEFUL_REPLAY_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_SECURITY_BOUNDARY_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_BROWSER_BRIDGE_RESILIENCE_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_PACKAGE_INTEGRITY_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_LIVE_PARITY_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_CONCURRENCY_TRACE_GATE_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "RECEIVER_LAUNCHER_SCRIPT_AUDIT_REPORT.json",
+        "clean": true
+      },
+      {
+        "path": "PCMMAD_RUNTIME_SURFACE_CONTRACT.json",
+        "clean": true
+      }
+    ]
+  },
+  "schema_contract": {
+    "clean": true,
+    "path": "baseline/pcmmad_receiver/pcmmad_lab_action_schema_v10_3_pcmmad_native_protocol_compact_30_router.json",
+    "operation_count": 30,
+    "unique_operation_count": 30
+  },
+  "csc_contract": {
+    "clean": true,
+    "surfaces": {
+      "core_cycle": true,
+      "sop_availability": true,
+      "sop_freshness": true,
+      "holonic_audit": true,
+      "doctrine_coverage": true
+    }
+  },
+  "host_bound_deferred": [
+    "Windows PowerShell parser/runtime execution",
+    "live ngrok tunnel and Custom GPT callback",
+    "live D:/E: mount parity against surviving user data"
+  ]
+}

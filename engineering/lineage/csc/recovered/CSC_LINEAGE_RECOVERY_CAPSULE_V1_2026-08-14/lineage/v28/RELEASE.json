@@ -1,0 +1,18 @@
+{
+  "name": "PCMMAD Receiver",
+  "release": "V28 PDVER Recovery Refactor",
+  "version": "28.0.0-pdver-recovery",
+  "schema_version": "10.2.0",
+  "python_target": "3.12",
+  "created_at_utc": "2026-07-29T21:15:22.951381+00:00",
+  "authority": {
+    "specimen": "surviving PCMMAD_receiver(2).zip",
+    "specimen_sha256": "b4d8a284a0acc9ef37aa115d2be4e4b67550730d80555e06771bc41c820564a3",
+    "normative_standard": "docs/ergo_foundations/UNIFIED_CODE_STANDARDS_AGNOSTIC_2026-04-11.md"
+  },
+  "preservation_contract": {
+    "runtime_routes": 49,
+    "registered_tools": 75,
+    "custom_gpt_operations": 30
+  }
+}

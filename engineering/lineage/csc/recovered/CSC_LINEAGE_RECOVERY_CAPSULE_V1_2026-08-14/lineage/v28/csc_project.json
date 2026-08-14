@@ -1,0 +1,66 @@
+{
+  "project_name": "PCMMAD_receiver",
+  "active_roots": [
+    "baseline",
+    "system",
+    "tools",
+    "tests"
+  ],
+  "doctrine_roots": [
+    "docs",
+    "spec"
+  ],
+  "evidence_roots": [
+    "reports",
+    "data",
+    "browser_screenshots",
+    "browser_bridge_logs",
+    "extracted"
+  ],
+  "command_gates": [
+    {
+      "id": "receiver_launcher_audit",
+      "command": [
+        "{python}",
+        "tools/csc_native/receiver_launcher_script_audit_gate.py"
+      ],
+      "cwd": ".",
+      "required": true
+    },
+    {
+      "id": "receiver_route_trace",
+      "command": [
+        "{python}",
+        "tools/csc_native/receiver_full_route_trace_gate.py"
+      ],
+      "cwd": ".",
+      "required": true
+    }
+  ],
+  "report_gates": [
+    {
+      "id": "receiver_expression_clean",
+      "path": "reports/CONSTRAINT_FINALIZER_EXPRESSION_REPORT.json",
+      "clean_field": "final_clean",
+      "expected": true,
+      "required": true,
+      "inputs": [
+        "baseline",
+        "system",
+        "tools",
+        "tests",
+        "docs",
+        "spec",
+        "csc_project.json"
+      ]
+    }
+  ],
+  "sidecars": [
+    {
+      "id": "browser_bridge_optional",
+      "health_url": "http://127.0.0.1:4471/health",
+      "required": false,
+      "manual_start": true
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "project_name": "UNIVERSAL_CSC_FINALIZER",
+  "active_roots": [
+    "system",
+    "tools"
+  ],
+  "doctrine_roots": [
+    "docs"
+  ],
+  "evidence_roots": [
+    "reports",
+    "data"
+  ],
+  "command_gates": [
+    {
+      "id": "compile_self",
+      "command": [
+        "{python}",
+        "-m",
+        "compileall",
+        "system",
+        "tools/csc_native"
+      ],
+      "cwd": ".",
+      "required": true
+    }
+  ],
+  "report_gates": [],
+  "sidecars": []
+}

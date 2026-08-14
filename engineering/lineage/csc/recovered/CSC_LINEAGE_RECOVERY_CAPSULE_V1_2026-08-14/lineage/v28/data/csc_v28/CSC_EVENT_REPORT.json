@@ -1,0 +1,488 @@
+{
+  "tool_name": "CSC",
+  "core_cycle": {
+    "generated_at": "2026-07-29T21:35:31.672300+00:00",
+    "tool_name": "CSC",
+    "design_rule": "PDVER",
+    "probe": "scan whole lab code surface plus required CSC SOP and repaired-archive surfaces for structural cleanup findings, anti-pattern residue, style/idiom drift, and boundary/typing drift",
+    "derive": "use tri-doctrine invariants: theoretical maximum pressure, typed boundaries, evidence-before-inference, holonic clarity, continuity/archive integrity, anti-pattern inversion, and lifecycle-aware retention",
+    "verify": "profile-aware verification battery; CTO profile uses compileall + extension surface existence + manifest parse + governance surface existence + CSC entrypoint help",
+    "embody": "writes cycle report only; code corrections are expected to have been applied before or between CSC cycles",
+    "recurse": "rerun whole-surface probe/verify until findings are empty or max cycle count is reached, while explicitly self-auditing CSC core files",
+    "coverage_notes": [
+      "scans Python and Rust code surfaces, required local CSC SOP docs, and the repaired PCMMAD archive surface",
+      "uses AST-aware Python checks plus Rust/TOML text-pattern checks for unwrap/expect/panic/todo/unimplemented/dbg usage, path hygiene, and doctrine drift",
+      "includes CSC self-audit so the tool must remain cleaner than the lab it judges"
+    ],
+    "cycles": [
+      {
+        "cycle": 1,
+        "ts": "2026-07-29T21:35:31.660500+00:00",
+        "probe_findings": [],
+        "finding_summary": [],
+        "verification": [
+          {
+            "name": "compileall_runtime",
+            "return_code": 0,
+            "ok": true,
+            "stdout_tail": "Listing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/baseline/pcmmad_receiver'...\n",
+            "stderr_tail": ""
+          },
+          {
+            "name": "compileall_tools",
+            "return_code": 0,
+            "ok": true,
+            "stdout_tail": "Listing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/tools/csc_native'...\n",
+            "stderr_tail": ""
+          },
+          {
+            "name": "compileall_system",
+            "return_code": 0,
+            "ok": true,
+            "stdout_tail": "Listing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/system'...\nListing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/system/constraint_pipeline'...\nListing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/system/constraint_pipeline/profiles'...\n",
+            "stderr_tail": ""
+          },
+          {
+            "name": "receiver_schema_authority_gate",
+            "return_code": 0,
+            "ok": true,
+            "stdout_tail": "{\"report\": \"/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/reports/RECEIVER_SCHEMA_AUTHORITY_GATE_REPORT.json\", \"clean\": true}\n",
+            "stderr_tail": ""
+          },
+          {
+            "name": "receiver_baseline_selftest_gate",
+            "return_code": 0,
+            "ok": true,
+            "stdout_tail": "{\n  \"created_at_utc\": \"2026-07-29T21:35:31.461181+00:00\",\n  \"clean\": true,\n  \"baseline_root\": \"/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/baseline\",\n  \"compile_result\": {\n    \"name\": \"baseline_compileall\",\n    \"command\": [\n      \"/opt/pyvenv/bin/python\",\n      \"-m\",\n      \"compileall\",\n      \"/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/baseline/pcmmad_receiver\"\n    ],\n    \"return_code\": 0,\n    \"ok\": true,\n    \"stdout_tail\": \"Listing '/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/baseline/pcmmad_receiver'...\\n\",\n    \"stderr_tail\": \"\"\n  },\n  \"hardening_tests\": {\n    \"name\": \"server_hardening_tests\",\n    \"command\": [\n      \"/opt/pyvenv/bin/python\",\n      \"-m\",\n      \"unittest\",\n      \"tests.test_server_hardening\"\n    ],\n    \"return_code\": 0,\n    \"ok\": true,\n    \"stdout_tail\": \"\",\n    \"stderr_tail\": \"........\\n----------------------------------------------------------------------\\nRan 8 tests in 1.155s\\n\\nOK\\n\"\n  },\n  \"import_probe\": {\n    \"ok\": true,\n    \"route_count\": 49,\n    \"tool_count\": 75,\n    \"health_ok\": true,\n    \"preflight_ok\": true,\n    \"envelope_ok\": true,\n    \"envelope\": {\n      \"ok\": true,\n      \"status\": \"COMPLETED\",\n      \"return_code\": 0,\n      \"command\": [\n        \"/opt/pyvenv/bin/python\",\n        \"-c\",\n        \"print(\\\"selftest\\\")\"\n      ],\n      \"cwd\": \"/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver\",\n      \"stdout\": \"selftest\\n\",\n      \"stderr\": \"\",\n      \"stdout_truncated\": false,\n      \"stderr_truncated\": false,\n      \"duration_ms\": 1087,\n      \"error\": null\n    },\n    \"encoded_has_path\": true,\n    \"return_code\": 0,\n    \"stderr_tail\": \"\"\n  }\n}\n",
+            "stderr_tail": ""
+          }
+        ],
+        "csc_self_audit": {
+          "clean": true,
+          "checked_files": [],
+          "findings": []
+        },
+        "remediation_actions": [],
+        "cycle_clean": true
+      }
+    ],
+    "final_cycle_clean": true
+  },
+  "tri_doctrine_authority": {
+    "report_id": "CSC_TRI_DOCTRINE_AUTHORITY_REPORT_2026-04-15",
+    "authorities": [
+      {
+        "authority_id": "receiver_project",
+        "title": "PCMMAD Receiver V28 project bindings",
+        "source_kind": "local_doctrine",
+        "source_ref": "docs/receiver_doctrine/00_RECEIVER_PROJECT_BINDINGS.md"
+      },
+      {
+        "authority_id": "receiver_sop",
+        "title": "Receiver ingress and evaluation SOP",
+        "source_kind": "local_sop",
+        "source_ref": "docs/receiver_sop/01_RECEIVER_INGRESS_AND_EVALUATION_SOP.md"
+      },
+      {
+        "authority_id": "omega_local",
+        "title": "CODEX OMEGA v2.0",
+        "source_kind": "local_doctrine",
+        "source_ref": "docs/ergo_foundations/CODEX_OMEGA_BIBLE.md"
+      },
+      {
+        "authority_id": "unified_local",
+        "title": "UNIFIED CODE STANDARDS DOCTRINE v1.2",
+        "source_kind": "local_doctrine",
+        "source_ref": "docs/ergo_foundations/UNIFIED_CODE_STANDARDS_DOCTRINE_v1.2.md"
+      },
+      {
+        "authority_id": "csc_sop",
+        "title": "CSC SOP set",
+        "source_kind": "local_sop",
+        "source_ref": "docs/csc_sop/"
+      }
+    ],
+    "note": "CSC adopts Omega, Unified Code Doctrine, and the repaired PCMMAD archive as simultaneous authority layers."
+  },
+  "sop_availability": {
+    "report_id": "CSC_SOP_AVAILABILITY_REPORT_2026-04-15",
+    "local_docs": [
+      {
+        "path": "docs/csc_sop/00_CSC_START_AND_AUTHORITY.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/csc_sop/05_CSC_REQUIRED_SOP_SET.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/csc_sop/09_CSC_SOP_FRESHNESS_AND_MUTATION_LAG_SOP.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/csc_sop/10_CSC_GENERAL_GUIDE_AND_UNIVERSALIZATION.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/csc_sop/11_CSC_SERVER_EXECUTION_METHODOLOGY_FOR_UNRELIABLE_PLANES.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/receiver_doctrine/00_RECEIVER_PROJECT_BINDINGS.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "docs/receiver_sop/01_RECEIVER_INGRESS_AND_EVALUATION_SOP.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "spec/PCMMAD_RECEIVER_V28_PDVER_REFACTOR_SPEC.md",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "reports/INITIAL_EXTRACTION_MANIFEST.json",
+        "present": true,
+        "missing_phrases": []
+      },
+      {
+        "path": "reports/INITIAL_PACKAGE_EVALUATION.json",
+        "present": true,
+        "missing_phrases": []
+      }
+    ],
+    "repaired_archive_root": "/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/data/imports",
+    "repaired_archive_files": [],
+    "clean": true,
+    "note": "Local CSC SOP set and repaired PCMMAD archive control files must be present before CSC can claim tri-doctrine readiness."
+  },
+  "sop_freshness": {
+    "report_id": "CSC_SOP_FRESHNESS_REPORT_2026-04-15",
+    "latest_meaningful_lab_mutation_path": "",
+    "latest_meaningful_lab_mutation_epoch": 0.0,
+    "latest_required_sop_path": "reports/INITIAL_PACKAGE_EVALUATION.json",
+    "latest_required_sop_epoch": 1785360844.7348783,
+    "items": [
+      {
+        "path": "docs/csc_sop/00_CSC_START_AND_AUTHORITY.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/csc_sop/05_CSC_REQUIRED_SOP_SET.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/csc_sop/09_CSC_SOP_FRESHNESS_AND_MUTATION_LAG_SOP.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/csc_sop/10_CSC_GENERAL_GUIDE_AND_UNIVERSALIZATION.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/csc_sop/11_CSC_SERVER_EXECUTION_METHODOLOGY_FOR_UNRELIABLE_PLANES.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/receiver_doctrine/00_RECEIVER_PROJECT_BINDINGS.md",
+        "modified_at_epoch": 1785359882.7548625,
+        "age_seconds": 1048,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "docs/receiver_sop/01_RECEIVER_INGRESS_AND_EVALUATION_SOP.md",
+        "modified_at_epoch": 1785358666.446843,
+        "age_seconds": 2265,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "spec/PCMMAD_RECEIVER_V28_PDVER_REFACTOR_SPEC.md",
+        "modified_at_epoch": 1785359723.01086,
+        "age_seconds": 1208,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "reports/INITIAL_EXTRACTION_MANIFEST.json",
+        "modified_at_epoch": 1785359723.09486,
+        "age_seconds": 1208,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      },
+      {
+        "path": "reports/INITIAL_PACKAGE_EVALUATION.json",
+        "modified_at_epoch": 1785360844.7348783,
+        "age_seconds": 86,
+        "lag_from_latest_mutation_seconds": 0,
+        "stale": false
+      }
+    ],
+    "active_heat_window_seconds": 86400,
+    "max_mutation_lag_seconds": 1800,
+    "max_required_sop_set_age_seconds": 259200,
+    "clean": true,
+    "note": "Freshness compares required local SOP updates against current time and the latest meaningful lab mutation surface, excluding CSC's own report directory."
+  },
+  "antipattern_inversion": {
+    "report_id": "CSC_ANTI_PATTERN_INVERSION_REPORT_2026-04-15",
+    "entries": [],
+    "note": "CSC should invert anti-patterns into stronger invariants and primitives, not only list defects."
+  },
+  "holonic_audit": {
+    "report_id": "CSC_HOLONIC_AUDIT_REPORT_2026-04-15",
+    "entries": [
+      {
+        "subsystem_id": "receiver_runtime",
+        "file_path": "baseline/pcmmad_receiver/server.py",
+        "purpose": "Promoted PCMMAD receiver process entrypoint.",
+        "boundary": "Authenticated local authority-plane boundary.",
+        "interface": "Flask application process.",
+        "invariants": [
+          "server entrypoint",
+          "Flask app factory",
+          "typed environment bind configuration"
+        ],
+        "hazards": [
+          "required route-family failure",
+          "schema drift",
+          "global interpreter drift"
+        ],
+        "status": "clean",
+        "missing_signals": []
+      },
+      {
+        "subsystem_id": "receiver_action_schema",
+        "file_path": "baseline/pcmmad_receiver/pcmmad_lab_action_schema_v10_2_pdver_compact_30_router.json",
+        "purpose": "Compact action schema/router for PCMMAD receiver tools.",
+        "boundary": "Custom GPT import boundary.",
+        "interface": "OpenAPI 3.0.3 JSON schema.",
+        "invariants": [
+          "openapi",
+          "paths",
+          "components",
+          "exactly 30 unique operation IDs"
+        ],
+        "hazards": [
+          "tool/schema mismatch",
+          "stale ngrok URL"
+        ],
+        "status": "clean",
+        "missing_signals": []
+      },
+      {
+        "subsystem_id": "receiver_evaluation_report",
+        "file_path": "reports/INITIAL_PACKAGE_EVALUATION.json",
+        "purpose": "Static package evaluation output.",
+        "boundary": "Evaluation boundary.",
+        "interface": "JSON report.",
+        "invariants": [
+          "module_count",
+          "compileall_returncode"
+        ],
+        "hazards": [
+          "evaluation drift"
+        ],
+        "status": "clean",
+        "missing_signals": []
+      },
+      {
+        "subsystem_id": "task_finalizer",
+        "file_path": "system/finalize_task.py",
+        "purpose": "Run CSC and finalize receiver lab tasks.",
+        "boundary": "Finalization boundary.",
+        "interface": "CLI script.",
+        "invariants": [
+          "csc output",
+          "final_clean"
+        ],
+        "hazards": [
+          "silent success"
+        ],
+        "status": "clean",
+        "missing_signals": []
+      }
+    ],
+    "clean": true,
+    "note": "CSC holonic audit checks whether the active holonic profile 'PCMMAD_receiver' remains explicit enough to survive maintenance pressure."
+  },
+  "doctrine_coverage": {
+    "report_id": "CSC_TRI_DOCTRINE_COVERAGE_REPORT_2026-04-15",
+    "authorities": [
+      "receiver_project",
+      "receiver_sop",
+      "omega_local",
+      "unified_local",
+      "csc_sop"
+    ],
+    "entries": [
+      {
+        "requirement_id": "REQ_RECEIVER_INGRESS",
+        "normalized_class": "receiver_ingress_and_evidence_boundary",
+        "title": "Receiver ingress and evidence boundary",
+        "authorities": [
+          "csc_sop"
+        ],
+        "status": "enforced",
+        "enforcement_surfaces": [
+          "sop_availability",
+          "doctrine_coverage"
+        ],
+        "active_findings": [],
+        "blockers": []
+      },
+      {
+        "requirement_id": "REQ_RECEIVER_VERIFICATION",
+        "normalized_class": "receiver_compile_and_static_evaluation",
+        "title": "Receiver compile and static evaluation",
+        "authorities": [
+          "csc_sop"
+        ],
+        "status": "enforced",
+        "enforcement_surfaces": [
+          "verification_battery",
+          "doctrine_coverage"
+        ],
+        "active_findings": [],
+        "blockers": []
+      },
+      {
+        "requirement_id": "REQ_RECEIVER_FINALIZER",
+        "normalized_class": "receiver_finalizer_and_doctrine_gate",
+        "title": "Receiver finalizer and doctrine gate",
+        "authorities": [
+          "csc_sop"
+        ],
+        "status": "enforced",
+        "enforcement_surfaces": [
+          "verification_battery",
+          "doctrine_coverage"
+        ],
+        "active_findings": [],
+        "blockers": []
+      }
+    ],
+    "clean": true,
+    "note": "Coverage means each load-bearing tri-doctrine class has an inspectable enforcement surface or an explicit partial/missing marker."
+  },
+  "loc_compliance": {
+    "created_at_utc": "2026-07-29T21:35:31.678057+00:00",
+    "audit_scope": "Every Python LOC under baseline/pcmmad_receiver, tools/csc_native, system, and tests; generated/extracted/data surfaces excluded.",
+    "doctrine_basis": {
+      "CODEX_OMEGA_BIBLE.md": {
+        "sha256": "9d4f70d54994fd9e620452bed750cb8d7b83841668ea31a9f137ce9dffdc8fad",
+        "bytes": 170766,
+        "role": "theoretical maximum / immutable laws / Omega quality frame"
+      },
+      "UNIFIED_CODE_STANDARDS_DOCTRINE_v1.2.md": {
+        "sha256": "a00fc7c36b5a090c131e0b02eb8a7fb8352f04c53696400b8635eeba8c29f5c2",
+        "bytes": 24169,
+        "role": "canonical Rahl-authored code standards / PDVER / code-level mandates"
+      }
+    },
+    "rule_basis": {
+      "OMEGA_L1_NO_STUBS": {
+        "severity": "BLOCKER",
+        "basis": "Law 1 / 0-Day Not Someday: no stubs, TODOs, placeholders, incomplete implementation framed as done."
+      },
+      "OMEGA_L4_EVIDENCE_BOUNDARY": {
+        "severity": "HIGH",
+        "basis": "Law 4 / Pedantic Verification: no unsupported confidence, no unread-gap language in load-bearing code comments/docs."
+      },
+      "UCS_FAILURE_LOCALITY": {
+        "severity": "HIGH",
+        "basis": "Failure locality: no silent failures, swallowed exceptions, or untraceable propagation."
+      },
+      "UCS_TYPED_BOUNDARY": {
+        "severity": "HIGH",
+        "basis": "Typed boundaries: avoid dict-smearing, stringly APIs, anonymous payload leakage across module seams."
+      },
+      "UCS_SUBSTRATE_SOVEREIGNTY": {
+        "severity": "HIGH",
+        "basis": "Substrate sovereignty: imports are material; heavy or brittle dependencies must be justified/lazy."
+      },
+      "UCS_COGNITIVE_CONSERVATION": {
+        "severity": "MEDIUM",
+        "basis": "Cognitive conservation: parameters <=4, file/function/nesting complexity within working-memory limits."
+      },
+      "UCS_ERROR_VALUES": {
+        "severity": "HIGH",
+        "basis": "Errors must be explicit/actionable; no broad catch without structured conversion or re-raise."
+      },
+      "UCS_JSON_BOUNDARY": {
+        "severity": "MEDIUM",
+        "basis": "Serialization formats explicit/versioned; centralize JSON boundaries."
+      },
+      "UCS_COMMAND_BOUNDARY": {
+        "severity": "HIGH",
+        "basis": "Execution boundaries must use hardened envelopes; no shell=True; no ad hoc subprocess output shapes."
+      },
+      "UCS_STATE_DISCIPLINE": {
+        "severity": "MEDIUM",
+        "basis": "Global state requires explicit lifecycle; prefer append-only/immutable state where feasible."
+      },
+      "UCS_HARD_CODED_PATH": {
+        "severity": "MEDIUM",
+        "basis": "Substrate sovereignty / boundary discipline: hardcoded machine paths are local truth leakage unless isolated in config."
+      }
+    },
+    "file_count": 0,
+    "total_loc": 0,
+    "finding_count": 0,
+    "severity_counts": {},
+    "rule_counts": {},
+    "surface_finding_counts": {},
+    "files": [],
+    "findings": [],
+    "per_line_index": "reports/CODEX_UNIFIED_LOC_AUDIT_LINES.jsonl",
+    "promotion_readiness": "CONDITIONAL"
+  },
+  "guide_quality": {
+    "created_at_utc": "2026-07-29T21:35:31.679487+00:00",
+    "audit_name": "CSC guide-derived style/quality/hygiene audit",
+    "audit_scope": "Project-agnostic Python surfaces when present: baseline/pcmmad_receiver, tools/csc_native, system, tests.",
+    "rubric_path": "/mnt/data/pcmmad_refactor_work/refactored/PCMMAD_receiver/docs/external_guides/GEMINI_GUIDES_EVALUATION_RUBRIC.json",
+    "line_length": 100,
+    "metrics": {
+      "functions": 0,
+      "classes": 0,
+      "max_function_lines": 0,
+      "max_parameters": 0,
+      "max_nesting": 0,
+      "long_functions_over_30": 0,
+      "loc": 0,
+      "lines_over_limit": 0,
+      "files": 0
+    },
+    "finding_count": 0,
+    "severity_counts": {},
+    "rule_counts": {},
+    "file_counts": {},
+    "findings": [],
+    "strict_failure_count": 0,
+    "advisory_only": true
+  }
+}
