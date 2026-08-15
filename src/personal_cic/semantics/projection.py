@@ -1956,9 +1956,11 @@ def _traffic_message_signs(
 def _traffic_situation(
     entity: Entity,
     state: TrafficSituationState,
+    observation: ObservationState | None,
 ) -> Iterable[SemanticAssertion]:
     provenance = _derived_provenance(entity, "traffic.fusion")
     temporal = SemanticTemporalContext(derived_at=state.derived_at)
+    auth = _authority_qualifiers(observation)
 
     yield _collection_scope_assertion(
         subject=f"{entity.entity_id}:traffic-situation-scope",
@@ -1974,8 +1976,7 @@ def _traffic_situation(
             state.scope_radius_miles,
         ),
         qualifiers={
-            "semantic_authority_state": "locally_derived",
-            "current_authority": True,
+            **auth,
             "scope_is_awareness_domain": True,
             "scope_is_not_event_location": True,
         },
@@ -1996,8 +1997,7 @@ def _traffic_situation(
             _q(
                 {
                     "derived_at": state.derived_at,
-                    "semantic_authority_state": "locally_derived",
-                    "current_authority": True,
+                    **auth,
                 }
             ),
         )
@@ -2052,8 +2052,7 @@ def _traffic_situation(
                         "not_independent_corroboration": True,
                         "not_cross_lineage_equivalence": True,
                         "not_causal_inference": True,
-                        "semantic_authority_state": "locally_derived",
-                        "current_authority": True,
+                        **auth,
                     }
                 ),
             )
@@ -2117,7 +2116,7 @@ def project_entity_semantics(entity: Entity) -> tuple[SemanticAssertion, ...]:
 
     situation = entity.get(TrafficSituationState)
     if situation is not None:
-        out.extend(_traffic_situation(entity, situation))
+        out.extend(_traffic_situation(entity, situation, observation))
 
     out.extend(_system_state(entity, observation))
     return tuple(out)
