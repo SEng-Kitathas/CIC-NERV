@@ -10,7 +10,14 @@ from .economics import (
     EconomicRelation,
     EconomicRelationKind,
 )
-from .evidence import EvidenceRelation, EvidenceRelationKind, Statement, StatementBasis
+from .evidence import (
+    EvidenceDependencyIndex,
+    EvidenceRelation,
+    EvidenceRelationKind,
+    RequalificationImpact,
+    Statement,
+    StatementBasis,
+)
 from .human import HumanReport, ProtectedSourceRef
 from .query import (
     CollectionGap,
@@ -49,6 +56,7 @@ __all__ = [
     "EconomicAmountRole",
     "EconomicRelation",
     "EconomicRelationKind",
+    "EvidenceDependencyIndex",
     "EvidenceRelation",
     "EvidenceRelationKind",
     "HandlingPolicy",
@@ -62,6 +70,7 @@ __all__ = [
     "ObservationOpportunity",
     "ProtectedSourceRef",
     "PublicationMedium",
+    "RequalificationImpact",
     "SourceAgent",
     "SourceAgentKind",
     "SourceLineage",
