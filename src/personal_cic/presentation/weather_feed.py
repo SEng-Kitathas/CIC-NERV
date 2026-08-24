@@ -91,16 +91,31 @@ def _item(record: dict) -> dict | None:
     }
 
 
+_TAIL_BYTES = 512 * 1024
+
+
+def _read_tail(path: Path, max_bytes: int = _TAIL_BYTES) -> bytes:
+    """Read at most max_bytes from the end of a potentially large journal."""
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        read_size = min(size, max_bytes)
+        handle.seek(size - read_size)
+        data = handle.read(read_size)
+    if size > read_size:
+        first_newline = data.find(b"\n")
+        if first_newline < 0:
+            return b""
+        data = data[first_newline + 1:]
+    return data
+
+
 def build_weather_feed(path: Path | None, limit: int = 24) -> list[dict]:
     if path is None or not path.exists():
         return []
-    # The CIC journal is intentionally sparse. Bound the projection scan anyway.
-    data = path.read_bytes()
-    if len(data) > 512 * 1024:
-        data = data[-512 * 1024:]
-        first_newline = data.find(b"\n")
-        if first_newline >= 0:
-            data = data[first_newline + 1:]
+    # Bound acquisition itself; never materialize the full durable journal just
+    # to retain its final projection window.
+    data = _read_tail(path)
     items = []
     for line in data.decode("utf-8", errors="replace").splitlines():
         if not line.strip():
