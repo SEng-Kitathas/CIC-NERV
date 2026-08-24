@@ -3,6 +3,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from personal_cic.runtime import PersistentRuntime
 from personal_cic.runtime_authority import (
@@ -129,6 +130,173 @@ class RuntimeAuthorityTests(unittest.TestCase):
                 "enabled collection worker failed: world-awareness",
                 records[-1]["payload"]["reason"],
             )
+
+    def test_persistent_runtime_collects_local_before_presentation_without_duplicate_startup_cycle(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            runtime = PersistentRuntime(
+                self._runtime_config(root),
+                Path("config/health.json"),
+            )
+            order = []
+
+            class FakePresentation:
+                def start(self_inner):
+                    order.append("presentation")
+                    runtime.request_stop("test complete")
+
+                def stop(self_inner):
+                    return None
+
+            runtime.presentation = FakePresentation()
+
+            def collect(_context):
+                order.append("collect")
+
+            with patch("personal_cic.runtime.collect_once", side_effect=collect):
+                runtime.run()
+
+            self.assertEqual(order, ["collect", "presentation"])
+            self.assertIsNone(runtime._local_collection_failure)
+
+    def test_unexpected_local_collection_failure_blocks_presentation_and_final_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            runtime = PersistentRuntime(
+                self._runtime_config(root),
+                Path("config/health.json"),
+            )
+            presentation_started = False
+
+            class FakePresentation:
+                def start(self_inner):
+                    nonlocal presentation_started
+                    presentation_started = True
+
+                def stop(self_inner):
+                    return None
+
+            runtime.presentation = FakePresentation()
+
+            with patch(
+                "personal_cic.runtime.collect_once",
+                side_effect=RuntimeError("forced local collection failure"),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "forced local collection failure",
+                ):
+                    runtime.run()
+
+            self.assertFalse(presentation_started)
+            self.assertIsNotNone(runtime._local_collection_failure)
+            self.assertFalse((root / "world.json").exists())
+            records = [
+                json.loads(line)
+                for line in (root / "events.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
+            self.assertEqual(records[-1]["event_type"], "RuntimeStopping")
+            self.assertIn(
+                "local collection failed during startup_qualification",
+                records[-1]["payload"]["reason"],
+            )
+
+    def test_remote_worker_failure_during_local_startup_gate_blocks_presentation(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            runtime = PersistentRuntime(
+                self._runtime_config(root),
+                Path("config/health.json"),
+            )
+            presentation_started = False
+            liveness = WorkerLiveness("world-awareness")
+            liveness.mark_starting()
+            liveness.mark_running()
+
+            class FakeWorker:
+                def prepare_reentry(self_inner):
+                    return None
+
+                def start(self_inner):
+                    return None
+
+                def runtime_status(self_inner):
+                    return liveness.snapshot()
+
+                def supervision_status(self_inner):
+                    return liveness.snapshot()
+
+                def stop(self_inner):
+                    return True
+
+            class FakePresentation:
+                def start(self_inner):
+                    nonlocal presentation_started
+                    presentation_started = True
+
+                def stop(self_inner):
+                    return None
+
+            runtime.world_awareness = FakeWorker()
+            runtime.presentation = FakePresentation()
+
+            def collect(_context):
+                status = liveness.mark_failed("forced during local gate")
+                runtime._record_worker_failure(status)
+
+            with patch("personal_cic.runtime.collect_once", side_effect=collect):
+                with self.assertRaises(WorkerAuthorityFailure):
+                    runtime.run()
+
+            self.assertFalse(presentation_started)
+            self.assertFalse((root / "world.json").exists())
+
+    def test_requested_stop_during_worker_start_does_not_run_local_startup_collection(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            runtime = PersistentRuntime(
+                self._runtime_config(root),
+                Path("config/health.json"),
+            )
+
+            class FakeWorker:
+                def prepare_reentry(self_inner):
+                    return None
+
+                def start(self_inner):
+                    runtime.request_stop("test requested during worker start")
+
+                def runtime_status(self_inner):
+                    liveness = WorkerLiveness("world-awareness")
+                    liveness.mark_starting()
+                    liveness.mark_running()
+                    return liveness.snapshot()
+
+                def supervision_status(self_inner):
+                    liveness = WorkerLiveness("world-awareness")
+                    liveness.mark_starting()
+                    liveness.mark_running()
+                    return liveness.snapshot()
+
+                def stop(self_inner):
+                    return True
+
+            class FakePresentation:
+                def start(self_inner):
+                    return None
+
+                def stop(self_inner):
+                    return None
+
+            runtime.world_awareness = FakeWorker()
+            runtime.presentation = FakePresentation()
+
+            with patch("personal_cic.runtime.collect_once") as collect:
+                runtime.run()
+
+            collect.assert_not_called()
 
     def test_runtime_metadata_exposes_worker_liveness_without_world_authority(self):
         with tempfile.TemporaryDirectory() as tmp_name:

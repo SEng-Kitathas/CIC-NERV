@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from pathlib import Path
 import os
 import signal
@@ -18,6 +19,12 @@ from personal_cic.runtime_authority import (
 )
 from personal_cic.world_awareness import WorldAwarenessWorker
 from personal_cic.traffic_awareness import TrafficAwarenessWorker
+
+
+@dataclass(frozen=True, slots=True)
+class _LocalCollectionFailure:
+    phase: str
+    detail: str
 
 
 class PersistentRuntime:
@@ -45,6 +52,7 @@ class PersistentRuntime:
             self._runtime_started_at: str | None = None
             self._worker_failure_lock = threading.Lock()
             self._worker_failure: WorkerRuntimeStatus | None = None
+            self._local_collection_failure: _LocalCollectionFailure | None = None
             self.presentation: PresentationServer | None = None
             self.world_awareness: WorldAwarenessWorker | None = None
             self.traffic_awareness: TrafficAwarenessWorker | None = None
@@ -116,6 +124,38 @@ class PersistentRuntime:
                 f"{failure.terminal_failure or 'worker no longer alive'}"
             )
 
+    def _collect_local_once(self, *, phase: str) -> float:
+        cycle_started = time.monotonic()
+        self._raise_if_worker_failed()
+        try:
+            collect_once(self.context)
+        except Exception as exc:
+            detail = " ".join(
+                f"{type(exc).__name__}: {exc}".split()
+            )[:1000]
+            failure = _LocalCollectionFailure(
+                phase=phase,
+                detail=detail or type(exc).__name__,
+            )
+            self._local_collection_failure = failure
+            with self._worker_failure_lock:
+                worker_failure = self._worker_failure
+            local_reason = (
+                f"local collection failed during {phase}: "
+                f"{failure.detail}"
+            )
+            self.stop_reason = (
+                local_reason
+                if worker_failure is None
+                else f"{self.stop_reason}; {local_reason}"
+            )
+            self.stop_event.set()
+            raise
+
+        self._raise_if_worker_failed()
+        self._snapshot_if_due()
+        return cycle_started
+
     def _presentation_metadata(self) -> dict:
         return {
             "pid": os.getpid(),
@@ -168,23 +208,38 @@ class PersistentRuntime:
             if self.traffic_awareness is not None:
                 self.traffic_awareness.start()
                 self._raise_if_worker_failed()
+
+            # Re-entry gate for main-thread local collectors. Persisted local
+            # telemetry/ObservationState and HealthState may have been earned in
+            # a previous process epoch or under different health thresholds.
+            # Promote the first normal local collection cycle ahead of
+            # presentation rather than exposing those persisted claims first.
+            # A stop requested while workers are starting means the runtime is
+            # already leaving the startup transition. Do not perform the newly
+            # introduced local qualification cycle after that stop request.
+            if self.stop_event.is_set():
+                cycle_started = time.monotonic()
+            else:
+                cycle_started = self._collect_local_once(
+                    phase="startup_qualification",
+                )
+
             if self.presentation is not None:
                 self.presentation.start()
 
             self._raise_if_worker_failed()
             while not self.stop_event.is_set():
-                cycle_started = time.monotonic()
-                self._raise_if_worker_failed()
-                collect_once(self.context)
-                self._snapshot_if_due()
-                self._raise_if_worker_failed()
-
                 elapsed = time.monotonic() - cycle_started
                 wait_for = max(
                     0.0,
                     self.runtime_config.collection_interval_seconds - elapsed,
                 )
                 self.stop_event.wait(wait_for)
+                if self.stop_event.is_set():
+                    break
+                cycle_started = self._collect_local_once(
+                    phase="runtime_cycle",
+                )
 
             # A worker callback wakes the main loop immediately. Do not convert
             # that terminal failure into a normal requested stop merely because
@@ -201,6 +256,7 @@ class PersistentRuntime:
 
             with self._worker_failure_lock:
                 worker_failure = self._worker_failure
+            local_collection_failure = self._local_collection_failure
 
             stopping_reason = self.stop_reason
             if incomplete_workers:
@@ -216,6 +272,11 @@ class PersistentRuntime:
                 # remote state, but startup re-entry withdraws that authority before
                 # presentation. Do not create a new final snapshot that could be
                 # mistaken for a gracefully quiesced runtime after worker failure.
+                stopping_reason = self.stop_reason
+            elif local_collection_failure is not None:
+                # An unexpected main-thread local collection exception can occur
+                # after partial in-process mutation. Do not persist a new final
+                # snapshot under a false graceful-quiescence interpretation.
                 stopping_reason = self.stop_reason
             else:
                 self._snapshot_if_due(force=True)
